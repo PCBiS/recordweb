@@ -1,0 +1,134 @@
+[
+    {
+        "platform": "chzzk",
+        "id": "45e71a76e949e16a34764deb962f9d9f",
+        "name": "아야츠노 유니",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "36ddb9bb4f17593b60f1b63cec86611d",
+        "name": "사키하네 후야",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "b044e3a3b9259246bc92e863e7d3f3b8",
+        "name": "시라유키 히나",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "4515b179f86b67b4981e16190817c580",
+        "name": "네네코 마시로",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "4325b1d5bbc321fad3042306646e2e50",
+        "name": "아카네 리제",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "a6c4ddb09cdb160478996007bff35296",
+        "name": "아라하시 타비",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "64d76089fba26b180d9c9e48a32600d9",
+        "name": "텐코 시부키",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "516937b5f85cbf2249ce31b0ad046b0f",
+        "name": "아오쿠모 린",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "4d812b586ff63f8a2946e64fa860bbf5",
+        "name": "하나코 나나",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "8fd39bb8de623317de90654718638b10",
+        "name": "유즈하 리코",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "chzzk",
+        "id": "b5ed5db484d04faf4d150aedd362f34b",
+        "name": "강지",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".ts",
+        "record_enabled": true,
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": []
+    },
+    {
+        "platform": "cime",
+        "id": "hebi",
+        "name": "헤비",
+        "output_dir": "chzzk",
+        "quality": "best",
+        "extension": ".mp4",
+        "recordWatchParty": false,
+        "watchPartyExcludeTags": [],
+        "record_enabled": true
+    }
+]

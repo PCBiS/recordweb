@@ -1,0 +1,62 @@
+{
+    "autoRecordingMode": false,
+
+    "plugin_type": "basic",
+    "timemachine_time_shift": 10,
+
+    "autoPostProcessing": true,
+    "deleteAfterPostProcessing": false,
+    "removeFixedPrefix": true,
+    "moveAfterProcessingEnabled": false,
+    "moveAfterProcessing": "",
+    "postNewWindow": false,
+
+    "recheckInterval": 120,
+    "filenamePattern": "[{start_time}] {channel_name} {safe_live_title} {record_quality}{frame_rate}{file_extension}",
+
+    "splitRecordingMode": false,
+    "splitPostProcessing": true,
+    "autoStopInterval": 0,
+    "splitOverlapSec": 0,
+
+    "gpuCount": 1,
+
+    "stream_copy": true,
+
+    "video_codec": "libx264",
+    "preset": "fast",
+    "postprocess_resolution": "source",
+    "use_bitrate_mode": true,
+    "video_quality": 33,
+    "video_bitrate": "1000k",
+    "vbv_maxrate": "",
+    "vbv_bufsize": "",
+    "audio_codec": "aac",
+    "audio_bitrate": "192k",
+    "extra_ffmpeg_options": "",
+
+    "video_codec_gpu1": "libx264",
+    "preset_gpu1": "fast",
+    "postprocess_resolution_gpu1": "source",
+    "use_bitrate_mode_gpu1": true,
+    "video_quality_gpu1": 33,
+    "video_bitrate_gpu1": "1000k",
+    "vbv_maxrate_gpu1": "",
+    "vbv_bufsize_gpu1": "",
+    "audio_codec_gpu1": "aac",
+    "audio_bitrate_gpu1": "192k",
+    "extra_ffmpeg_options_gpu1": "",
+
+    "loginMode": false,
+    "port": 5000,
+
+    "enableTray": false,
+    "minimizeToTrayOnClose": false,
+    "minimizeToTrayOnStart": false,
+
+    "fileManagerEnabled": false,
+    "fileManagerRoots": [],
+    "fileManagerMode": "blacklist",
+    "fileManagerReadOnly": true,
+    "trashEnabled": false
+}

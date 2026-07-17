@@ -1,0 +1,26 @@
+{
+    "telegram_enabled": false,
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+
+    "discord_enabled": false,
+    "discord_webhook_url": "",
+
+    "events": {
+        "record_started": false,
+        "record_finished": false,
+        "record_start_failed": true,
+        "record_abnormally_stopped": true,
+        "record_user_stopped": false,
+        "postprocess_finished": true,
+        "postprocess_failed": true,
+        "cookie_auth_failed": true,
+        "watchparty_skipped": false,
+        "disk_space_low": true
+    },
+
+    "limits": {
+        "dedupe_seconds": 300,
+        "disk_space_low_gb": 10
+    }
+}

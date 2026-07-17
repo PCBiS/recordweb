@@ -1,0 +1,14 @@
+services:
+  recordweb:
+    image: ghcr.io/pcbis/recordweb:${RECORDWEB_TAG:-latest}
+    pull_policy: always
+    container_name: recordweb
+    init: true
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "${RECORDWEB_PORT:-5000}:5000"
+    volumes:
+      - ./data/json:/app/json
+      - ./recordings:/recordings

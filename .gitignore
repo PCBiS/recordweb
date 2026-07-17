@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.log
+.env
+data/
+recordings/
+json/account.json
+json/login.json
+json/recordfsm_runtime.json
+json/recordfsm_runtime.lock
+json/runtime*.json
+json/*.log

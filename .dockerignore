@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.log
+.git/
+.gitignore
+data/
+recordings/
+dependent/ffmpeg/
+dependent/streamlink/
+dependent/yt-dlp/
+dependent/aria2c/

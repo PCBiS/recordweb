@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>설정관리</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+</head>
+<body class="page-config" data-account-exists="{{ 1 if account else 0 }}">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <h2>내맘대로 자동녹화 웹UI<span class="chip chip--ver">{{ program_version }}</span></h2>
+      </div>
+    </div>
+
+    <script>
+        var savedPreset = "{{ config.preset }}";
+        var savedPresetGpu1 = "{{ config.preset_gpu1|default(config.preset)|default('fast') }}";
+    </script>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+        
+        {% if config.loginMode %}
+            {% if request.session.get('logged_in') %}
+                <!-- 로그인된 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+
+                <!-- 로그인 정보와 로그아웃 링크 -->
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <!-- 로그인되지 않은 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <!-- 로그인 모드가 꺼져 있을 때 메뉴 표시 -->
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+
+            <!-- 로그인 정보와 로그아웃 링크 -->
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+
+    <div id="content">
+        <h1>설정 관리</h1>
+        <h3>※녹화 도중 설정 변경 불가</h3>
+
+        <!-- 설정 업데이트 폼 -->
+        <form id="configForm"
+              data-has-account="{{ 1 if account else 0 }}"  action="{{ request.url_for('updateConfig') }}" method="POST">
+            <input type="hidden" id="gpuAssignmentsJson" name="gpuAssignmentsJson" value="">
+      
+            <label for="autoRecordingMode">자동녹화 모드 사용 [치지직/씨미]</label>
+            <select id="autoRecordingMode" name="autoRecordingMode">
+                <option value="true" {% if config.autoRecordingMode %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.autoRecordingMode %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+                자동녹화 모드가 활성화되면 프로그램 시작 시 모든 채널의 녹화를 자동으로 시작합니다.
+                <br><strong>(프로그램 재시작 필요)</strong>
+            </p>
+
+            <label for="enableTray">최소화 시스템 트레이 사용</label>
+            <select id="enableTray" name="enableTray">
+                <option value="false" {{ 'selected' if not config.enableTray else '' }}>OFF</option>
+                <option value="true"  {{ 'selected' if config.enableTray  else '' }}>ON</option>
+            </select>
+            <p class="description">
+                프로그램 시작시 명령창을 최소화 상태로 시작하고 제어가능 트레이 아이콘이 생성됩니다.
+                <br><strong>(프로그램 재시작 필요)</strong>
+            </p>
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
+            <label for="plugin_type">플러그인 선택 [치지직]</label>
+            <select id="plugin_type" name="plugin_type">
+                <option value="basic" {% if config.plugin_type == "basic" %}selected{% endif %}>기본 플러그인</option>
+                <option value="timemachine_plus" {% if config.plugin_type == "timemachine_plus" %}selected{% endif %}>타임머신 플러스 플러그인</option>
+            </select>
+            <p class="description">원하는 플러그인을 선택하세요.</p>
+            <table class="plugin-desc-table">
+                <thead>
+                    <tr>
+                        <th>플러그인</th>
+                        <th>설명</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>기본 플러그인</td>
+                        <td>타임머신 시프트 최대 6초 및 1회 녹화에 9시간 녹화 제한</td>
+                    </tr>
+                    <tr>
+                        <td>타임머신 플러스 플러그인</td>
+                        <td>타임머신 시프트 최대 1시간(3600초) 및 9시간이상 한 파일로 연속녹화가 가능</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p></p>
+
+            <label for="timemachine_time_shift">타임머신 시프트 앞당김 시간(초) [치지직]</label>
+            <input type="text" id="timemachine_time_shift" name="timemachine_time_shift" value="{{ config.timemachine_time_shift }}">
+            <p class="description">타임머신 플러스 사용시 현재 라이브 시간보다 n초 앞선<br>시점부터 녹화를 시작하도록 설정할 수 있습니다.<br>(입력예 : 최대 3600 최소 1)</p>
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
+            <label for="autoPostProcessing">녹화 완료 후 자동 후처리 [치지직 전용]</label>
+            <select id="autoPostProcessing" name="autoPostProcessing">
+                <option value="true" {% if config.autoPostProcessing %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.autoPostProcessing %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+                치지직 녹화 완료 후 스트림복사 또는 열화인코딩 후처리를 실행할지 설정합니다.<br>
+                씨미는 이 옵션을 사용하지 않고, 녹화 종료 후 내부적으로 <b>.part.ts → .mp4 자동 remux</b>를 수행합니다.
+            </p>
+
+            <label for="deleteAfterPostProcessing">후처리 완료 후 원본파일 삭제 [치지직 전용]</label>
+            <select id="deleteAfterPostProcessing" name="deleteAfterPostProcessing">
+                <option value="true" {% if config.deleteAfterPostProcessing %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.deleteAfterPostProcessing %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+                치지직 후처리 완료 후 원본 녹화파일을 삭제할지 설정합니다.<br>
+                씨미 임시파일은 씨미 remux 성공 시 자체적으로 자동 정리됩니다.
+            </p>
+
+            <label for="removeFixedPrefix">후처리 완료파일 fixed_ 접두사 제거 [치지직 전용]</label>
+            <select id="removeFixedPrefix" name="removeFixedPrefix">
+                <option value="true" {% if config.removeFixedPrefix %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.removeFixedPrefix %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+                치지직 후처리 결과 파일명에서 <b>fixed_</b> 접두사를 제거할지 설정합니다.<br>
+                씨미는 fixed_ 후처리 파일을 만들지 않으므로 이 옵션을 사용하지 않습니다.
+            </p>
+
+            <label for="moveAfterProcessingEnabled">녹화 완료 파일 자동이동 [치지직/씨미]</label>
+            <select id="moveAfterProcessingEnabled" name="moveAfterProcessingEnabled">
+                <option value="true" {% if config.moveAfterProcessingEnabled %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.moveAfterProcessingEnabled %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+                치지직은 후처리 완료 파일을, 씨미는 자동 remux 완료된 mp4 파일을 지정 경로로 이동합니다.
+            </p>
+
+            <label for="moveAfterProcessing">녹화 완료 파일 이동할 경로 직접입력 [치지직/씨미]</label>
+            <input type="text" id="moveAfterProcessing" name="moveAfterProcessing" value="{{ config.moveAfterProcessing }}">
+            <p class="description">자동 이동할 경로를 입력합니다. 예: D:/test</p>
+
+            <label for="postNewWindow">후처리 명령창을 새창으로 열기 [치지직 전용]</label>
+            <select id="postNewWindow" name="postNewWindow">
+                <option value="true" {% if config.postNewWindow %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.postNewWindow %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+                치지직 후처리 작업 명령창을 메인창이 아닌 새창에서 실행할지 설정합니다.<br>
+                씨미 remux 마무리 작업에는 이 옵션이 적용되지 않습니다.
+            </p>
+
+            <label for="recheckInterval">방송 재탐색 주기(초) [치지직/씨미]</label>
+            <input type="text" id="recheckInterval" name="recheckInterval" value="{{ config.recheckInterval }}">
+            <p class="description">
+                등록된 채널의 방송이 시작되었는지 재탐색하는 간격을 설정합니다.<br>
+                치지직 타임머신 플러그인 사용 시에는 가능하면 120초 이상을 권장합니다.<br>
+                씨미도 같은 재탐색 주기를 사용하지만, 타임머신 기능은 적용되지 않습니다.<br><br>
+                ※ 간격이 너무 짧으면 IP밴이나 채널이 패싱되는 경우가 있습니다.
+            </p>
+
+            <label for="filenamePattern">파일명 생성규칙 [치지직/씨미]</label>
+            <input type="text" id="filenamePattern" name="filenamePattern" value="{{ config.filenamePattern }}">
+            <table class="description">
+                <thead>
+                    <tr>
+                        <th>설정 값</th>
+                        <th>설명</th>
+                    </tr>
+                </thead>
+                <tbody>
+					<tr>
+						<td>{recording_time}</td>
+						<td>녹화 시작 날짜_시간 (예: 240801_183507)</td>
+					</tr>
+					<tr>
+						<td>{broadcast_time}</td>
+						<td>방송 시작 날짜_시간 (예: 240801_183507)</td>
+					</tr>
+					<tr>
+						<td>{start_time}</td>
+						<td>방송 시작 날짜 (예: 2024-08-01)</td>
+					</tr>
+                    <tr>
+                        <td>{safe_live_title}</td>
+                        <td>방송 제목</td>
+                    </tr>
+                    <tr>
+                        <td>{channel_name}</td>
+                        <td>스트리머 채널명</td>
+                    </tr>
+                    <tr>
+                        <td>{record_quality}</td>
+                        <td>녹화 해상도</td>
+                    </tr>
+                    <tr>
+                        <td>{frame_rate}</td>
+                        <td>녹화 프레임</td>
+                    </tr>
+                    <tr>
+                        <td>{file_extension}</td>
+                        <td>파일 확장자</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
+            <label for="splitRecordingMode">분할녹화 모드 사용 [치지직 전용]</label>
+            <select id="splitRecordingMode" name="splitRecordingMode">
+                <option value="true" {% if config.splitRecordingMode %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.splitRecordingMode %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+                치지직 녹화파일을 지정한 시간 단위로 나누어 생성합니다.<br>
+                3600초를 지정하면 녹화파일이 1시간씩 나누어 생성됩니다.<br>
+                씨미는 현재 단일 .part.ts 임시파일을 mp4로 remux하는 구조라 이 옵션을 사용하지 않습니다.
+            </p>
+
+            <label for="splitPostProcessing">분할녹화 완료 후 자동 후처리 [치지직]</label>
+            <select id="splitPostProcessing" name="splitPostProcessing"
+                    {{ '' if (config and config.splitRecordingMode) else 'disabled' }}>
+              <option value="true"  {% if config.splitPostProcessing %}selected{% endif %}>ON</option>
+              <option value="false" {% if not config.splitPostProcessing %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">분할녹화 완료 후 자동 후속 후처리 여부를 설정합니다.</p>
+
+            <label for="autoStopInterval">분할녹화 시간 (초) [치지직]</label>
+            <input type="text" id="autoStopInterval" name="autoStopInterval" value="{{ config.autoStopInterval }}" {% if not config.splitRecordingMode %}disabled{% endif %}>
+            <p class="description">분할녹화 모드 사용시, 분할녹화 시간 가격을 설정합니다.</p>
+
+              <label for="splitOverlapSec">분할 파일간 오버랩 시간(초) [치지직]</label>
+              <input type="number" id="splitOverlapSec"	name="splitOverlapSec" min="0" max="30" step="1" value="{{ (config.splitOverlapSec or 0) if config else 0 }}"
+                     {{ '' if (config and config.splitRecordingMode) else 'disabled' }}>
+              <p class="description">분할녹화시 분할 파일 사이의 누락된 부분이 없도록 앞/뒤 영상에 겹치는 시간을 설정합니다. 
+              <br>권장 겹침시간 : 6 ~ 10초,  0 이면 겹침 없음.</p>
+
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
+            <label for="gpuCount">후처리 인코딩에 사용할 GPU 수 [치지직 전용]</label>
+            {% set gpu_count = (config.gpuCount|default(1)|int) %}
+            <select id="gpuCount" name="gpuCount">
+              <option value="1" {{ 'selected' if gpu_count != 2 else '' }}>1 (단일 GPU)</option>
+              <option value="2" {{ 'selected' if gpu_count == 2 else '' }}>2 (복수 GPU)</option>
+            </select>
+            <p class="description">
+              치지직 열화인코딩 후처리에 사용할 GPU 프로필 수를 설정합니다.<br>
+              씨미는 원본 스트림을 저장한 뒤 mp4로 remux하므로 이 GPU 인코딩 설정을 사용하지 않습니다.
+            </p>
+
+            <label for="stream_copy">후처리 방식 선택 (스트림복사/열화인코딩) [치지직 전용]</label>
+            <select id="stream_copy" name="stream_copy">
+                <option value="true" {% if config.stream_copy %}selected{% endif %}>스트림복사</option>
+                <option value="false" {% if not config.stream_copy %}selected{% endif %}>열화인코딩</option>
+            </select>
+            <p class="description">
+                치지직 후처리 방식을 선택합니다. 스트림복사는 원본 유지, 열화인코딩은 용량 절약 목적입니다.<br>
+                씨미는 이 설정을 사용하지 않고, 항상 원본 스트림을 복사한 뒤 mp4로 remux합니다.
+            </p>
+
+            <label for="video_codec">인코딩 비디오 코덱 종류 [치지직]</label>
+            <select id="video_codec" name="video_codec">
+                <option value="libx264" {% if config.video_codec == 'libx264' %}selected{% endif %}>x264 CPU만 사용</option>
+                <option value="libx265" {% if config.video_codec == 'libx265' %}selected{% endif %}>HEVC CPU만 사용</option>
+                <option value="h264_qsv" {% if config.video_codec == 'h264_qsv' %}selected{% endif %}>h264 인텔 GPU 가속</option>
+                <option value="hevc_qsv" {% if config.video_codec == 'hevc_qsv' %}selected{% endif %}>HEVC 인텔 GPU 가속</option>
+                <option value="h264_nvenc" {% if config.video_codec == 'h264_nvenc' %}selected{% endif %}>h264 지포스 GPU 가속</option>
+                <option value="hevc_nvenc" {% if config.video_codec == 'hevc_nvenc' %}selected{% endif %}>HEVC 지포스 GPU 가속</option>
+                <option value="h264_amf" {% if config.video_codec == 'h264_amf' %}selected{% endif %}>h264 라데온 GPU 가속</option>
+                <option value="hevc_amf" {% if config.video_codec == 'hevc_amf' %}selected{% endif %}>HEVC 라데온 GPU 가속</option>
+            </select>
+            <p class="description">사용할 비디오 코덱을 선택합니다.</p>
+
+            <label for="preset">비디오 인코딩 프리셋 [치지직]</label>
+            <select id="preset" name="preset" ></select>
+            <table class="description">
+                <thead>
+                    <tr>
+                        <th>코덱</th>
+                        <th>사용 가능한 인코딩 프리셋</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><b>[x264 / HEVC]</b> CPU만 사용</td>
+                        <td>ultrafast / superfast / veryfast / faster / fast / medium / slow / slower / veryslow / placebo</td>
+                    </tr>
+                    <tr>
+                        <td style="color:blue"><b>[h264 / HEVC]</b> 인텔 GPU</td>
+                        <td>veryfast / faster / fast / medium / slow / slower</td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="color:darkgreen"><b>[h264 / HEVC]</b> 지포스 GPU<br>(NVENC 7세대 이상)</td>
+                        <td>p1 (ultrafast) / p2 (superfast) / p3 (veryfast) / p4 (faster) / p5 (fast) / p6 (medium) / p7 (slow)</td>
+                    </tr>
+                    <tr>
+                        <td style="color:green"><b>[h264 / HEVC]</b>지포스 GPU<br>(NVENC 6세대 이하)</td>
+                        <td>default / slow / medium / fast / hp / hq / bd / ll / llhq / llhp / lossless / losslesshp</td>
+                    </tr>
+                    <tr>
+                        <td style="color:red"><b>[h264 / HEVC]</b> 라데온 GPU</td>
+                        <td>balanced / speed / quality</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="description">
+                * NVENC 7세대 이상 지포스 GPU 가속 :<br>16, 20, 30, 40, 50 시리즈 이상만 지원 (GTX 1650 GDDR5 제외)<br><br>
+                * NVENC 6세대 이하 지포스 GPU 가속 :<br>지포스600~900, 1000, GTX 1650 GDDR5 한정
+            </p>
+
+			{% set pp0 = config.postprocess_resolution|default('source') %}
+
+			<label for="postprocess_resolution">영상 출력 해상도(원본/1080p/720p/480p) [치지직]</label>
+			<select id="postprocess_resolution" name="postprocess_resolution">
+			  <option value="source" {{ 'selected' if pp0 == 'source' else '' }}>원본유지</option>
+			  <option value="1080p"  {{ 'selected' if pp0 == '1080p'  else '' }}>1080p</option>
+			  <option value="720p"   {{ 'selected' if pp0 == '720p'   else '' }}>720p</option>
+			  <option value="480p"   {{ 'selected' if pp0 == '480p'   else '' }}>480p</option>
+			</select>
+			<p class="description">열화인코딩에서 해상도 값을 변경합니다(스트림복사 사용 시 미적용).</p>
+
+            <label for="use_bitrate_mode">화질 및 용량 비율 제어 방식 (비트레이트/퀄리티 모드) [치지직]</label>
+            <select id="use_bitrate_mode" name="use_bitrate_mode">
+                <option value="true" {% if config.use_bitrate_mode %}selected{% endif %}>비트레이트 모드</option>
+                <option value="false" {% if not config.use_bitrate_mode %}selected{% endif %}>퀄리티 모드</option>
+            </select>
+            <p class="description">비트레이트 모드와 퀄리티 모드 중 선택합니다.</p>
+
+            <label for="video_quality">비디오 퀄리티 모드 값 (퀄리티 모드 사용 시 입력) [치지직]</label>
+            <input type="text" id="video_quality" name="video_quality" value="{{ config.video_quality }}">
+            <table class="description">
+                <thead>
+                    <tr>
+                        <th>퀄리티 모드 값 (예시)</th>
+                        <th>설명</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>23~24</td>
+                        <td>5~10% 화질저하, 약간의 용량 절약</td>
+                    </tr>
+                    <tr>
+                        <td>26~28</td>
+                        <td>15~25% 화질저하, 용량 절약</td>
+                    </tr>
+                    <tr>
+                        <td>32~35</td>
+                        <td>30~40% 화질저하, 용량 절약</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="description">퀄리티 값이 낮을수록 화질은 좋아지지만 파일 용량은 커집니다.<br>표는 x264 CPU 기준 추정치이며, GPU 가속이나 HEVC에서는 다를 수 있습니다.</p>
+
+            <label for="video_bitrate">평균 비트레이트 값 (비트레이트 모드 사용 시 입력) [치지직]</label>
+            <input type="text" id="video_bitrate" name="video_bitrate" value="{{ config.video_bitrate }}">
+            <p class="description">평균 비트레이트 값을 설정합니다. 값이 낮을수록<br>화질이 떨어지고 용량이 줄어듭니다.<br>치지직 1080P 기준 8000k 값입니다.<br><br>(예: 5000k)</p>
+
+            <label for="vbv_maxrate">최대 비트레이트 값 (비트레이트 모드 사용 시 입력) [치지직]</label>
+            <input type="text" id="vbv_maxrate" name="vbv_maxrate" value="{{ config.vbv_maxrate }}">
+            <p class="description">인코딩시 비트레이트 가변 폭의 최대값을 지정합니다.<br><br>(예: 7500k, 권장: 평균 비트레이트 값의 1.5~2배)</p>
+
+            <label for="vbv_bufsize">비트레이트 버퍼 값 (비트레이트 모드 사용 시 입력) [치지직]</label>
+            <input type="text" id="vbv_bufsize" name="vbv_bufsize" value="{{ config.vbv_bufsize }}">
+            <p class="description">인코딩 시 화려하거나 복잡한 장면이 갑자기<br>늘어나거나 줄어드는 것을 부드럽게 관리하기<br>위한 임시 저장공간의 크기를 입력합니다. <br><br>(예: 15000k, 권장: 평균 비트레이트 값의 3~4배)</p>
+
+            <label for="extra_ffmpeg_options">추가 인코딩 명령어 입력 [치지직 전용]</label>
+            <input type="text" id="extra_ffmpeg_options" name="extra_ffmpeg_options" value="{{ config.extra_ffmpeg_options }}">
+            <p class="description">
+              • <b>Look-ahead</b>: 다음 프레임을 사전 확인하여 인코딩 압축 효율을 높입니다.<br>
+              • 장점: <b>선명도</b>가 상승하고 <b>용량</b>이 줄어듭니다.<br>
+              • 단점: 인코딩 속도가 <b>느려집니다.</b>
+            </p>
+
+            <table class="description">
+              <thead>
+                <tr>
+                  <th>GPU</th>
+                  <th>사용 인코더</th>
+                  <th>낮은 압축효율 예시</th>
+                  <th>높은 압축효율 예시</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Intel QSV -->
+                <tr>
+                  <td style="color:blue"><b>인텔</b></td>
+                  <td><code>h264_qsv</code> / <code>hevc_qsv</code></td>
+                  <td>
+                    <div><code>-look_ahead 1 -bf 2</code></div>
+                  </td>
+                  <td>
+                    <div><code>-look_ahead 1 -look_ahead_depth 20 -bf 5</code></div>
+                  </td>
+                </tr>
+
+                <!-- NVIDIA NVENC -->
+                <tr>
+                  <td style="color:darkgreen"><b>지포스</b></td>
+                  <td><code>h264_nvenc</code> / <code>hevc_nvenc</code></td>
+                  <td>
+                    <div><code>-rc-lookahead 10 -bf 2</code></div>
+                  </td>
+                  <td>
+                    <div><code>-rc-lookahead 20 -bf 3</code></div>
+                  </td>
+                </tr>
+
+                <!-- AMD AMF -->
+                <tr>
+                  <td style="color:red"><b>라데온</b></td>
+                  <td><code>h264_amf</code> / <code>hevc_amf</code></td>
+                  <td>
+                    <div><code>-preanalysis true -pa_lookahead_buffer_depth 10 -bf 2</code></div>
+                  </td>
+                  <td>
+                    <div><code>-preanalysis true -pa_lookahead_buffer_depth 20 -bf 3</code></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p class="description" style="margin-top:8px;">
+              • 비교적 빠른 인코딩 속도와 적당한 화질 향상을 원한다면 <b>낮은 압축효율</b><br>
+              • 인코딩 속도가 느려져도 더 높은 화질 향상을 원한다면 <b>높은 압축효율</b><br><br>
+              • <b>B-프레임이 0</b>이면 look-ahead 효과가 거의 없습니다. 보통 <code>-bf 2~4</code> 권장.<br>
+              • 일부 구형/특수 모델은 제한이 있습니다(예: 지포스 GTX 1630, 1650 GDDR5 등 B-프레임 제한).<br>
+              • 인텔 QSV는 6세대(Skylake) 이상 지원(효율은 <b>7세대+</b> 권장), 라데온은 RX 6000 이상 권장.
+            </p>
+
+            <label for="audio_codec">오디오 코덱 종류 [치지직]</label>
+            <select id="audio_codec" name="audio_codec">
+                <option value="aac" {% if config.audio_codec == 'aac' %}selected{% endif %}>AAC</option>
+                <option value="mp3" {% if config.audio_codec == 'mp3' %}selected{% endif %}>MP3</option>
+            </select>
+            <p class="description">오디오 코덱을 선택합니다.<br>치지직 기본 오디오 코덱은 AAC 입니다.</p>
+
+            <label for="audio_bitrate">오디오 비트레이트 값 [치지직]</label>
+            <select id="audio_bitrate" name="audio_bitrate">
+                <option value="copy" {% if config.audio_bitrate == 'copy' %}selected{% endif %}>스트림복사(원본유지)</option>
+                <option value="64k" {% if config.audio_bitrate == '64k' %}selected{% endif %}>64k</option>
+                <option value="96k" {% if config.audio_bitrate == '96k' %}selected{% endif %}>96k</option>
+                <option value="128k" {% if config.audio_bitrate == '128k' %}selected{% endif %}>128k</option>
+                <option value="160k" {% if config.audio_bitrate == '160k' %}selected{% endif %}>160k</option>
+                <option value="192k" {% if config.audio_bitrate == '192k' %}selected{% endif %}>192k</option>
+                <option value="224k" {% if config.audio_bitrate == '224k' %}selected{% endif %}>224k</option>
+                <option value="256k" {% if config.audio_bitrate == '256k' %}selected{% endif %}>256k</option>
+                <option value="320k" {% if config.audio_bitrate == '320k' %}selected{% endif %}>320k</option>
+            </select>
+            <p class="description">오디오 비트레이트 값을 선택합니다.<br>치지직 오디오 비트레이트 최대값은 192k(원본) 입니다.</p>
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
+            <!-- GPU1 인코딩 프로필 (GPU 수=2일 때만 표시) -->
+            <div id="gpu1ProfileSection"
+                style="{% if (config.gpuCount|default(1)|int) != 2 %}display:none;{% endif %}">
+              <h2>치지직 인코딩 프로필 (GPU1) - 치지직 후처리 열화인코딩 전용</h2>
+
+              <label for="video_codec_gpu1">비디오 코덱(GPU1)</label>
+              <select id="video_codec_gpu1" name="video_codec_gpu1">
+                {% set vc1 = config.video_codec_gpu1|default(config.video_codec) %}
+                <option value="libx264"    {{ 'selected' if vc1 == 'libx264' else '' }}>x264 CPU (libx264)</option>
+                <option value="libx265"    {{ 'selected' if vc1 == 'libx265' else '' }}>HEVC CPU (libx265)</option>
+                <option value="h264_qsv"   {{ 'selected' if vc1 == 'h264_qsv' else '' }}>H264 인텔GPU (h264_qsv)</option>
+                <option value="hevc_qsv"   {{ 'selected' if vc1 == 'hevc_qsv' else '' }}>HEVC 인텔GPU (hevc_qsv)</option>
+                <option value="h264_nvenc" {{ 'selected' if vc1 == 'h264_nvenc' else '' }}>H264 지포스GPU (h264_nvenc)</option>
+                <option value="hevc_nvenc" {{ 'selected' if vc1 == 'hevc_nvenc' else '' }}>HEVC 지포스GPU (hevc_nvenc)</option>
+                <option value="h264_amf"   {{ 'selected' if vc1 == 'h264_amf' else '' }}>H264 라데온 (h264_amf)</option>
+                <option value="hevc_amf"   {{ 'selected' if vc1 == 'hevc_amf' else '' }}>HEVC 라데온 (hevc_amf)</option>
+              </select>
+
+              <label for="preset_gpu1">프리셋(GPU1)</label>
+              <select id="preset_gpu1" name="preset_gpu1"></select>
+
+
+			  {% set pp1 = config.postprocess_resolution_gpu1|default(pp0)|default('source') %}
+
+			  <label for="postprocess_resolution_gpu1">영상 출력 해상도(GPU1)</label>
+			  <select id="postprocess_resolution_gpu1" name="postprocess_resolution_gpu1">
+			    <option value="source" {{ 'selected' if pp1 == 'source' else '' }}>원본유지</option>
+			    <option value="1080p"  {{ 'selected' if pp1 == '1080p'  else '' }}>1080p</option>
+			    <option value="720p"   {{ 'selected' if pp1 == '720p'   else '' }}>720p</option>
+			    <option value="480p"   {{ 'selected' if pp1 == '480p'   else '' }}>480p</option>
+			  </select>
+
+              <label for="use_bitrate_mode_gpu1">화질/용량 제어 방식(GPU1)</label>
+              {% set ubm1 = config.use_bitrate_mode_gpu1|default(config.use_bitrate_mode)|default(true) %}
+              <select id="use_bitrate_mode_gpu1" name="use_bitrate_mode_gpu1">
+                <option value="true"  {{ 'selected' if ubm1 else '' }}>비트레이트 모드</option>
+                <option value="false" {{ 'selected' if not ubm1 else '' }}>퀄리티 모드</option>
+              </select>
+
+              <label for="video_quality_gpu1">퀄리티 값(GPU1)</label>
+              <input id="video_quality_gpu1" name="video_quality_gpu1" type="number"
+                    value="{{ config.video_quality_gpu1|default(config.video_quality)|default(33) }}">
+
+              <label for="video_bitrate_gpu1">비트레이트 값(GPU1)</label>
+              <input id="video_bitrate_gpu1" name="video_bitrate_gpu1" type="text"
+                    value="{{ config.video_bitrate_gpu1|default(config.video_bitrate)|default('') }}">
+
+              <label for="vbv_maxrate_gpu1">VBV maxrate(GPU1)</label>
+              <input id="vbv_maxrate_gpu1" name="vbv_maxrate_gpu1" type="text"
+                    value="{{ config.vbv_maxrate_gpu1|default('') }}">
+
+              <label for="vbv_bufsize_gpu1">VBV bufsize(GPU1)</label>
+              <input id="vbv_bufsize_gpu1" name="vbv_bufsize_gpu1" type="text"
+                    value="{{ config.vbv_bufsize_gpu1|default('') }}">
+
+              <label for="extra_ffmpeg_options_gpu1">추가 FFmpeg 옵션(GPU1)</label>
+              <input id="extra_ffmpeg_options_gpu1" name="extra_ffmpeg_options_gpu1" type="text"
+                    value="{{ config.extra_ffmpeg_options_gpu1|default('') }}">
+
+              <label for="audio_codec_gpu1">오디오 코덱(GPU1)</label>
+              <select id="audio_codec_gpu1" name="audio_codec_gpu1">
+                {% set ac1 = config.audio_codec_gpu1|default(config.audio_codec)|default('aac') %}
+                <option value="aac" {{ 'selected' if ac1 == 'aac' else '' }}>aac</option>
+                <option value="mp3" {{ 'selected' if ac1 == 'mp3' else '' }}>mp3</option>
+              </select>
+
+              <label for="audio_bitrate_gpu1">오디오 비트레이트(GPU1)</label>
+              {% set ab1 = config.audio_bitrate_gpu1|default(config.audio_bitrate)|default('copy') %}
+              <select id="audio_bitrate_gpu1" name="audio_bitrate_gpu1">
+                <option value="copy"  {{ 'selected' if ab1 == 'copy' else '' }}>스트림복사(원본유지)</option>
+                <option value="64k"   {{ 'selected' if ab1 == '64k' else '' }}>64k</option>
+                <option value="96k"   {{ 'selected' if ab1 == '96k' else '' }}>96k</option>
+                <option value="128k"  {{ 'selected' if ab1 == '128k' else '' }}>128k</option>
+                <option value="160k"  {{ 'selected' if ab1 == '160k' else '' }}>160k</option>
+                <option value="192k"  {{ 'selected' if ab1 == '192k' else '' }}>192k</option>
+              </select>
+            </div>
+
+              <!-- 채널 GPU 분배 (치지직 후처리 인코딩 전용) -->
+              <div id="gpuAssignSection"
+                  style="{% if (config.gpuCount|default(1)|int) != 2 %}display:none;{% endif %}">
+                <h2>치지직 채널 GPU 분배 (치지직 후처리 인코딩 전용)</h2>
+                <p class="description">
+                  ※ 이 분배는 <b>치지직(chzzk) 후처리 열화인코딩</b>에만 적용됩니다.
+                  씨미(cime)는 mp4 스트림 저장 방식이므로 치지직 후처리 GPU 분배 대상이 아닙니다.
+                  <br>저장 시 channels.json의 <b>gpu_index(0/1)</b>에 기록됩니다.
+                </p>
+
+                {% set ns = namespace(has_chzzk=false) %}
+                {% for ch in channels %}
+                  {% if (ch.platform|default('')) == 'chzzk' %}
+                    {% set ns.has_chzzk = true %}
+                    <div class="gpu-assign-row">
+                      <div class="gpu-assign-name">{{ ch.name }} (chzzk)</div>
+
+                      <select class="gpu-assign-select"
+                              data-gpu-assign
+                              data-channel-id="{{ ch.platform }}:{{ ch.id }}">
+                        <option value="0" {% if (ch.gpu_index|default(0)|int) != 1 %}selected{% endif %}>GPU0</option>
+                        <option value="1" {% if (ch.gpu_index|default(0)|int) == 1 %}selected{% endif %}>GPU1</option>
+                      </select>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+
+                {% if not ns.has_chzzk %}
+                  <p class="description">등록된 치지직(chzzk) 채널이 없습니다.</p>
+                {% endif %}
+              </div>
+
+
+            <!-- 알림 폼 -->
+            <h3>알림 설정</h3>
+            {% set ev = notification.events if notification.events is defined else {} %}
+            {% set limits = notification.limits if notification.limits is defined else {} %}
+
+            <p class="description">
+              알림 설정은 <code>json/notification.json</code>에 저장됩니다. 텔레그램과 디스코드 중 사용자가 선택하여 녹화진행 상황을 알림으로 받을 수 있으며, 아래 각 이벤트별 ON/OFF 설정은 치지직과 씨미 녹화에 모두 공통 적용됩니다. 
+            </p>
+
+            <label for="telegram_enabled">텔레그램 알림 사용</label>
+            <select id="telegram_enabled" name="telegram_enabled">
+              <option value="true" {% if notification.telegram_enabled %}selected{% endif %}>ON</option>
+              <option value="false" {% if not notification.telegram_enabled %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+              ON이면 선택한 알림 항목을 텔레그램 봇으로 전송합니다.
+              기존 <code>telegram.json</code>에서 직접 옮기기 쉽도록 봇 토큰과 채팅방 ID 항목명은 그대로 유지합니다.
+            </p>
+
+            <label for="telegram_bot_token">텔레그램 봇 토큰</label>
+            <input type="text" id="telegram_bot_token" name="telegram_bot_token"
+                   value="{{ notification.telegram_bot_token if notification.telegram_bot_token is defined else '' }}">
+            <p class="description">
+              BotFather에서 발급받은 봇 토큰입니다. 텔레그램 알림을 ON으로 사용할 때 필수입니다.
+            </p>
+
+            <label for="telegram_chat_id">텔레그램 봇 채팅방 ID</label>
+            <input type="text" id="telegram_chat_id" name="telegram_chat_id"
+                   value="{{ notification.telegram_chat_id if notification.telegram_chat_id is defined else '' }}">
+            <p class="description">
+              알림을 받을 개인 채팅 또는 그룹 채팅 ID입니다. 봇과 대화를 시작한 뒤 getUpdates 결과에서 확인할 수 있습니다.
+            </p>
+
+            <button type="button" id="testTelegramBtn">텔레그램 테스트 메시지 전송</button>
+
+            <hr>
+
+            <label for="discord_enabled">디스코드 알림 사용</label>
+            <select id="discord_enabled" name="discord_enabled">
+              <option value="true" {% if notification.discord_enabled %}selected{% endif %}>ON</option>
+              <option value="false" {% if not notification.discord_enabled %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+              ON이면 선택한 알림 항목을 디스코드 웹훅으로 전송합니다.
+              텔레그램과 동시에 켤 수 있으며, 같은 이벤트가 두 대상으로 함께 전송됩니다.
+            </p>
+
+            <label for="discord_webhook_url">디스코드 웹훅 URL</label>
+            <input type="text" id="discord_webhook_url" name="discord_webhook_url"
+                   value="{{ notification.discord_webhook_url if notification.discord_webhook_url is defined else '' }}">
+            <p class="description">
+              디스코드 채널 설정의 웹훅 메뉴에서 생성한 URL입니다. 디스코드 알림을 ON으로 사용할 때 필수 입력사항입니다.
+            </p>
+
+            <button type="button" id="testDiscordBtn">디스코드 테스트 메시지 전송</button>
+
+            <h3>알림 받을 항목</h3>
+            <p class="description">
+              알림받고 싶은 각 항목을 ON/OFF로 개별 설정합니다. 녹화 시작/종료/사용자 중지처럼 자주 발생할 수 있는 
+			  항목이 메신저를 통해 전달되며, 각 사용자의 상황에 따라 필요한 알람만 설정하는 것을 권장합니다.
+            </p>
+
+            <label for="notify_record_start_failed">녹화 시작 실패</label>
+            <select id="notify_record_start_failed" name="notify_record_start_failed">
+              <option value="true" {% if ev.record_start_failed %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.record_start_failed %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">녹화 의존 프로그램 실패, 녹화 명령 생성 실패 등 녹화가 시작되지 못한 경우 알림을 보냅니다.</p>
+
+            <label for="notify_record_abnormally_stopped">녹화 비정상 종료</label>
+            <select id="notify_record_abnormally_stopped" name="notify_record_abnormally_stopped">
+              <option value="true" {% if ev.record_abnormally_stopped %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.record_abnormally_stopped %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">방송 종료가 아닌 오류, 파일 병합 실패, 프로세스 비정상 종료처럼 확인이 필요한 종료 상황을 알립니다.</p>
+
+            <label for="notify_postprocess_failed">후처리 실패</label>
+            <select id="notify_postprocess_failed" name="notify_postprocess_failed">
+              <option value="true" {% if ev.postprocess_failed %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.postprocess_failed %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">치지직 후처리 인코딩/스트림복사 작업이 실패했을 때 알림을 보냅니다.</p>
+
+            <label for="notify_postprocess_finished">후처리 완료</label>
+            <select id="notify_postprocess_finished" name="notify_postprocess_finished">
+              <option value="true" {% if ev.postprocess_finished %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.postprocess_finished %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">치지직 후처리 작업이 정상 완료되었을 때 알림을 보냅니다. 씨미는 별도 후처리 없이 녹화 완료 이벤트로 처리됩니다.</p>
+
+            <label for="notify_cookie_auth_failed">쿠키/권한 문제</label>
+            <select id="notify_cookie_auth_failed" name="notify_cookie_auth_failed">
+              <option value="true" {% if ev.cookie_auth_failed %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.cookie_auth_failed %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">연령제한, 유로구독 권한 필요, 쿠키 만료, 로그인 필요 등 계정 인증 확인이 필요한 상황을 알립니다.</p>
+
+            <label for="notify_disk_space_low">디스크 용량 부족</label>
+            <select id="notify_disk_space_low" name="notify_disk_space_low">
+              <option value="true" {% if ev.disk_space_low %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.disk_space_low %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">녹화 저장 경로의 남은 용량이 아래 기준값 이하로 떨어지면 알림을 보냅니다.</p>
+
+            <label for="notify_watchparty_skipped">같이보기 조건 불일치</label>
+            <select id="notify_watchparty_skipped" name="notify_watchparty_skipped">
+              <option value="true" {% if ev.watchparty_skipped %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.watchparty_skipped %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">치지직 같이보기만 녹화를 선택한 채널에서 해당 조건이 맞지 않아 녹화를 건너뛴 경우 알림을 보냅니다.</p>
+
+            <label for="notify_record_started">녹화 시작</label>
+            <select id="notify_record_started" name="notify_record_started">
+              <option value="true" {% if ev.record_started %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.record_started %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">치지직 또는 씨미 녹화가 시작되었을 때 알림을 보냅니다.</p>
+
+            <label for="notify_record_finished">녹화 종료</label>
+            <select id="notify_record_finished" name="notify_record_finished">
+              <option value="true" {% if ev.record_finished %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.record_finished %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">치지직 또는 씨미 녹화가 정상 종료되었을 때 알림을 보냅니다.</p>
+
+            <label for="notify_record_user_stopped">사용자 중지</label>
+            <select id="notify_record_user_stopped" name="notify_record_user_stopped">
+              <option value="true" {% if ev.record_user_stopped %}selected{% endif %}>ON</option>
+              <option value="false" {% if not ev.record_user_stopped %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">사용자가 직접 녹화를 중지했을 때 알림을 보냅니다.</p>
+
+            <label for="notify_disk_space_low_gb">디스크 부족 경고 기준(GB)</label>
+            <input type="number" id="notify_disk_space_low_gb" name="notify_disk_space_low_gb" min="1" max="1024"
+                   value="{{ limits.disk_space_low_gb if limits.disk_space_low_gb is defined else 10 }}">
+            <p class="description">녹화파일이 생성되는 디스크 기준으로, 남은 디스크 용량이 설정한 값 이하가 되면 디스크 용량 부족 알림을 보냅니다.</p>
+
+            <label for="notify_dedupe_seconds">중복 알림 방지 시간(초)</label>
+            <input type="number" id="notify_dedupe_seconds" name="notify_dedupe_seconds" min="0" max="86400"
+                   value="{{ limits.dedupe_seconds if limits.dedupe_seconds is defined else 300 }}">
+            <p class="description">
+              같은 채널의 같은 동일한 이벤트를 지정한 시간 내에 반복 전송하지 않습니다.
+              0으로 설정하면 중복 방지를 사용하지 않습니다. 테스트 메시지는 이 제한과 무관하게 전송됩니다.
+            </p>
+
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
+            <!-- 파일 관리 폼 -->
+            <h3>파일 관리(웹 파일매니저)</h3>
+
+            <label for="fileManagerEnabled">파일매니저 사용</label>
+            <select id="fileManagerEnabled" name="fileManagerEnabled">
+              <option value="true"  {% if config.fileManagerEnabled %}selected{% endif %}>ON</option>
+              <option value="false" {% if not config.fileManagerEnabled %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+              로그인 모드가 ON일 때만 활성화됩니다. 기본값은 <b>블랙리스트(시스템 주요 경로만 제외, 나머지 전부 허용)</b>입니다.
+            </p>
+
+            <!-- ① 경로 모드 선택: 기본 blacklist -->
+            <label for="fileManagerMode">파일매니저 경로 모드</label>
+            <select id="fileManagerMode" name="fileManagerMode">
+              {% set fm_mode = (config.fileManagerMode if config.fileManagerMode is defined else 'blacklist') %}
+              <option value="blacklist" {% if fm_mode == 'blacklist' %}selected{% endif %}>블랙리스트(오픈)</option>
+              <option value="whitelist" {% if fm_mode == 'whitelist' %}selected{% endif %}>화이트리스트(허용 경로만)</option>
+            </select>
+            <p class="description">
+              • 블랙리스트: 시스템 핵심 폴더만 차단하고 나머지를 모두 탐색/삭제/이동 허용<br>
+              • 화이트리스트: 아래 “허용 경로” 목록에 포함된 경로만 접근 허용
+            </p>
+
+            <!-- ② 읽기전용 모드 -->
+            <label for="fileManagerReadOnly">읽기전용 모드</label>
+            <select id="fileManagerReadOnly" name="fileManagerReadOnly">
+              <option value="true"  {% if config.fileManagerReadOnly %}selected{% endif %}>ON</option>
+              <option value="false" {% if not config.fileManagerReadOnly %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">ON이면 생성/이름변경/이동/삭제가 모두 차단됩니다.</p>
+
+            <!-- ③ 휴지통 사용 -->
+            <label for="trashEnabled">휴지통(소프트 삭제) 사용</label>
+            <select id="trashEnabled" name="trashEnabled">
+              <option value="true"  {% if config.trashEnabled is not defined or config.trashEnabled %}selected{% endif %}>ON</option>
+              <option value="false" {% if config.trashEnabled is defined and not config.trashEnabled %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">
+              ON: 삭제 시 같은 루트의 <code>.trash</code>로 이동(복구 가능) / OFF: 즉시 완전삭제
+            </p>
+
+            <!-- ④ 허용 경로: 화이트리스트 모드에서만 표시 -->
+            <div id="fm-roots-section" style="display: {% if fm_mode == 'whitelist' %}block{% else %}none{% endif %};">
+              <label>허용 경로 (여러 개 가능)</label>
+              <div id="fm-roots">
+                <div id="fm-roots-list">
+                  {% set roots = config.fileManagerRoots or [] %}
+                  {% if roots|length == 0 %}
+                    <div class="fm-root-row" style="display:flex;gap:8px;align-items:center;margin:6px 0;">
+                      <input type="text" name="fileManagerRoots" placeholder="예: C:/recordWEB/record" style="flex:1;">
+                      <button type="button" class="rm-root">삭제</button>
+                    </div>
+                  {% else %}
+                    {% for r in roots %}
+                      <div class="fm-root-row" style="display:flex;gap:8px;align-items:center;margin:6px 0;">
+                        <input type="text" name="fileManagerRoots" value="{{ r }}" style="flex:1;">
+                        <button type="button" class="rm-root">삭제</button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                </div>
+                <button type="button" id="add-fm-root">경로 추가</button>
+              </div>
+            </div>
+
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
+            <h3>로그인 관련 설정</h3>
+            <label for="loginMode">로그인 모드 사용</label>
+            <select id="loginMode" name="loginMode">
+                <option value="true" {% if config.loginMode %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.loginMode %}selected{% endif %}>OFF</option>
+            </select>
+            <p class="description">로그인한 사용자만 사용하도록 설정</p>
+
+            <input type="submit" value="설정 업데이트">
+            
+            </form>
+
+            <!-- 계정 관리 영역 -->
+            <div id="account-fields" style="display: {% if config.loginMode %}block{% else %}none{% endif %};">
+              <h3>계정 정보 관리</h3>
+
+              {% if account %}
+              <div class="account-management">
+
+                <!-- 계정 수정 폼 -->
+                <form id="updateAccountForm" action="/updateAccount" method="POST">
+                  <input type="hidden" name="action" value="update">
+
+                  <label for="username">사용자명:</label>
+                  <input type="text" id="username" name="username" value="{{ account['username'] }}"
+                        {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+
+                  <label for="current_password">기존 비밀번호:</label>
+                  <input type="password" id="current_password" name="current_password"
+                        {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+
+                  <label for="new_password">새 비밀번호:</label>
+                  <input type="password" id="new_password" name="new_password"
+                        {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+
+                  <label for="new_password_confirm">새 비밀번호 확인:</label>
+                  <input type="password" id="new_password_confirm" name="new_password_confirm"
+                        {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+
+                  <input type="submit" value="계정 수정" class="submit-button">
+                </form>
+
+                <!-- 계정 삭제 폼 -->
+                <form action="/updateAccount" method="POST" class="delete-form">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="username" id="delete-username" value="{{ account['username'] }}">
+
+                  <input type="password" name="current_password" id="delete-current_password"
+                        placeholder="기존 비밀번호 입력"
+                        {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+
+                  <input type="submit" value="계정 삭제" class="delete-button">
+                </form>
+
+              </div>
+              {% else %}
+              <p>현재 저장된 계정이 없습니다.</p>
+              <button type="button" onclick="window.location.href='/register'">계정 생성</button>
+              {% endif %}
+            </div>
+    </div>
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+</body>
+</html>
