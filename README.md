@@ -101,7 +101,9 @@ docker compose -f compose.local.yaml up -d --build
 
 ## 이미지 배포
 
-`main` 브랜치에 푸시하거나 `v`로 시작하는 태그를 푸시하면 GitHub Actions가 Linux AMD64 이미지를 빌드해 GHCR에 게시합니다.
+`main` 브랜치에 푸시하거나 `v`로 시작하는 태그를 푸시하면 GitHub Actions가 Linux AMD64와 ARM64 이미지를 빌드해 하나의 멀티아키텍처 이미지로 GHCR에 게시합니다.
+
+Docker는 실행 장비에 맞는 이미지를 자동으로 선택합니다. Intel·AMD 기반 PC와 서버는 `linux/amd64`, Apple Silicon Mac과 64비트 ARM 장비는 `linux/arm64`를 사용합니다. 사용자는 아키텍처별 태그를 따로 지정할 필요가 없습니다.
 
 ```bash
 git tag v1.2.9
