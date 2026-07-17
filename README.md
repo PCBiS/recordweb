@@ -37,7 +37,28 @@ docker compose up -d
 - 녹화 결과: `./recordings`
 - 웹에서 출력 경로를 직접 지정할 때: `/recordings/원하는폴더`
 
-최초 실행 때 이미지의 기본 JSON 파일이 `./data/json`에 생성됩니다. 컨테이너를 삭제하거나 업데이트해도 이 두 호스트 폴더는 유지됩니다.
+> [!IMPORTANT]
+> `./recordings:/recordings` 마운트는 녹화 파일을 보존하기 위해 반드시 필요합니다.
+> 이 마운트를 제거하면 녹화물이 컨테이너 내부에 저장되어 컨테이너 재생성, 업데이트 또는 삭제 시 함께 사라질 수 있습니다.
+
+기본 `compose.yaml`에는 다음 필수 마운트가 이미 포함되어 있습니다.
+
+```yaml
+volumes:
+  - ./data/json:/app/json
+  - ./recordings:/recordings
+```
+
+`./recordings`는 컨테이너 경로가 아니라 `compose.yaml`이 있는 호스트 폴더의 `recordings` 디렉터리입니다. 서버의 다른 디스크에 저장하려면 왼쪽 경로만 절대 경로로 변경합니다.
+
+```yaml
+volumes:
+  - /mnt/recordings:/recordings
+```
+
+오른쪽 컨테이너 경로 `/recordings`는 변경하지 마세요. 웹에서 녹화 출력 경로를 설정할 때도 `/recordings` 아래를 사용해야 호스트에 보존됩니다.
+
+최초 실행 때 이미지의 기본 JSON 파일이 `./data/json`에 생성됩니다. 컨테이너를 삭제하거나 업데이트해도 두 호스트 폴더는 유지되지만, 서버 자체 장애에 대비해 `./data/json`과 `./recordings`를 함께 백업하는 것을 권장합니다.
 
 ## 포트 변경
 
