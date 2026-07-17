@@ -1,6 +1,9 @@
 # recordWEB Docker
 
 recordWEB v1.2.9를 Linux Docker 컨테이너에서 실행하기 위한 프로젝트입니다.
+https://gall.dcinside.com/mgallery/board/view/?id=stellive&no=2427022
+게시글의 ㅇㅇ(poestar)님께서 개발하셨으며 docker에서 배포 가능한 형식으로 사용하기 위해
+ChatGPT Codex를 이용하여 변환작업하였습니다.
 
 ## 빠른 실행
 
