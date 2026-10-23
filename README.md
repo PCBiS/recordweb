@@ -2,6 +2,8 @@
 
 recordWEB v1.2.9를 Linux Docker 컨테이너에서 실행하기 위한 프로젝트입니다.
 
+CA 수정 버전 `ghcr.io/pcbis/recordweb:v1.2.9-ca-20261023`의 기반 이미지·변경 범위·검증과 사용 방법은 [CA 릴리스 기록](CA-RELEASE.md)을 확인하세요. 이 버전은 AMD64 전용이며 기존 `latest`와 `v1.2.9` 태그는 유지합니다.
+
 ## 원본 프로그램 및 Docker 변환
 
 원본 recordWEB 프로그램은 `ㅇㅇ(poestar)`님께서 개발하셨습니다. 프로그램에 대한 자세한 설명은 [원본 게시글](https://gall.dcinside.com/mgallery/board/view/?id=stellive&no=2427022)에서 확인할 수 있습니다.

@@ -1,0 +1,84 @@
+name: Publish CA patched image
+
+on:
+  push:
+    branches:
+      - ca/v1.2.9-20261023
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: recordweb-v1.2.9-ca-20261023
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/pcbis/recordweb
+  IMAGE_VERSION: v1.2.9-ca-20261023
+  BASE_IMAGE: ghcr.io/pcbis/recordweb@sha256:7953c7491829599227275c6811d2773a2c2936656cdda14efc7fd647f7da61db
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out CA release source
+        uses: actions/checkout@v4
+
+      - name: Test exact CA filtering
+        run: python3 -m unittest discover -s security -p 'test_*.py' -v
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refuse to overwrite an existing release
+        shell: bash
+        run: |
+          if docker buildx imagetools inspect "$IMAGE_NAME:$IMAGE_VERSION" >/dev/null 2>&1; then
+            echo "The version already exists; use a new version for another release."
+            exit 1
+          fi
+
+      - name: Build CA-only OCI candidate from the original image
+        shell: bash
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false --sbom=false \
+            --build-arg "SOURCE_REVISION=$GITHUB_SHA" \
+            --file Dockerfile.ca \
+            --output "type=image,name=$IMAGE_NAME:ca-candidate-$GITHUB_SHA,push=true,oci-mediatypes=true" \
+            .
+
+      - name: Verify published candidate and original image
+        shell: bash
+        run: |
+          docker pull "$BASE_IMAGE"
+          docker pull "$IMAGE_NAME:ca-candidate-$GITHUB_SHA"
+          python3 security/verify_image.py \
+            --base "$BASE_IMAGE" \
+            --candidate "$IMAGE_NAME:ca-candidate-$GITHUB_SHA"
+          docker run --rm --network none --entrypoint python3 \
+            --mount "type=bind,src=$PWD/security/ca_policy.py,dst=/tmp/ca_policy.py,readonly" \
+            "$IMAGE_NAME:ca-candidate-$GITHUB_SHA" -I -B /tmp/ca_policy.py verify
+
+      - name: Publish the verified immutable version
+        shell: bash
+        run: |
+          docker buildx imagetools inspect --raw "$IMAGE_NAME:ca-candidate-$GITHUB_SHA" > /tmp/candidate-manifest.json
+          python3 -c 'import json; assert json.load(open("/tmp/candidate-manifest.json"))["mediaType"] == "application/vnd.oci.image.manifest.v1+json"'
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$IMAGE_NAME:$IMAGE_VERSION" "$IMAGE_NAME:ca-candidate-$GITHUB_SHA"
+          docker buildx imagetools inspect --raw "$IMAGE_NAME:$IMAGE_VERSION" > /tmp/release-manifest.json
+          cmp /tmp/candidate-manifest.json /tmp/release-manifest.json
+          docker buildx imagetools inspect "$IMAGE_NAME:$IMAGE_VERSION"
+          echo "Published $IMAGE_NAME:$IMAGE_VERSION (linux/amd64) after CA, configuration and layer verification." >> "$GITHUB_STEP_SUMMARY"
