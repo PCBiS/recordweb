@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+
+# The immutable AMD64 v1.2.9 image; no application or package rebuild.
+ARG BASE_IMAGE=ghcr.io/pcbis/recordweb@sha256:7953c7491829599227275c6811d2773a2c2936656cdda14efc7fd647f7da61db
+FROM ${BASE_IMAGE}
+
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.version="1.2.9-ca-20261023" \
+      org.opencontainers.image.description="recordWEB v1.2.9 with the 2026-10-23 CA trust policy" \
+      org.opencontainers.image.source="https://github.com/PCBiS/recordweb" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+
+# A read-only build mount keeps the helper out of the image's application tree.
+# CA regeneration and verification use no network or package manager.
+RUN --network=none \
+    --mount=type=bind,source=security/ca_policy.py,target=/tmp/ca_policy.py,ro \
+    python3 -I -B /tmp/ca_policy.py apply
