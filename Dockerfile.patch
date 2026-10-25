@@ -17,13 +17,13 @@ RUN --network=none \
 
 FROM ${BASE_IMAGE} AS runtime
 ARG SOURCE_REVISION
-LABEL org.opencontainers.image.version="1.2.9-patch-20261025" \
+LABEL org.opencontainers.image.version="1.2.9-patch-20261026" \
       org.opencontainers.image.description="recordWEB v1.2.9 directory metrics and application security fixes" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 
-COPY --from=regression /app/recordWEB.py /app/recordWEB.py
-COPY --from=regression /app/module/file_manager.py /app/module/file_manager.py
-COPY --from=regression /app/module/data_manager.py /app/module/data_manager.py
-COPY --from=regression /app/module/storage_metrics.py /app/module/storage_metrics.py
-COPY --from=regression /app/templates/config.html /app/templates/config.html
-COPY --from=regression /app/templates/static/js/script.js /app/templates/static/js/script.js
+COPY --chmod=0644 --from=regression /app/recordWEB.py /app/recordWEB.py
+COPY --chmod=0644 --from=regression /app/module/file_manager.py /app/module/file_manager.py
+COPY --chmod=0644 --from=regression /app/module/data_manager.py /app/module/data_manager.py
+COPY --chmod=0644 --from=regression /app/module/storage_metrics.py /app/module/storage_metrics.py
+COPY --chmod=0644 --from=regression /app/templates/config.html /app/templates/config.html
+COPY --chmod=0644 --from=regression /app/templates/static/js/script.js /app/templates/static/js/script.js
