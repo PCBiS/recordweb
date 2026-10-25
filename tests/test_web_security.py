@@ -136,6 +136,7 @@ class WebSecurityTests(unittest.IsolatedAsyncioTestCase):
             'LOGIN_PATH': str(self.account_file),
             'templates': SimpleNamespace(TemplateResponse=render_template),
             'PROGRAM_VERSION': 'security-test',
+            'PROGRAM_NAME': 'recordWEB security test',
             'recorder_manager': SimpleNamespace(),
             'busyFilePaths': lambda *args: [], 'isLocked': lambda *args: False,
             'listDir': lambda *args, **kwargs: [],
@@ -156,6 +157,7 @@ class WebSecurityTests(unittest.IsolatedAsyncioTestCase):
             'requireFileManager', 'requireWritableFileManager',
             'getCookies', 'updateCookies', 'configPage', 'get_config_api',
             'get_config', 'updateConfig', 'api_sys_metrics', 'updateAccount', 'login',
+            'loginPage', 'index',
             'api_files_usage', 'api_files_list', 'api_files_roots', 'api_files_ls',
             'api_files_disk_usage', 'api_files_download', 'api_files_mkdir',
             'api_files_rename', 'api_files_move', 'api_files_delete',
@@ -203,6 +205,23 @@ class WebSecurityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.config_reads, 0)
         self.assertTrue(self.config['loginMode'])
+
+    async def test_login_landing_and_protected_redirects_reach_root_without_authenticating(self):
+        for path in ['/login', '/config', '/cookies']:
+            with self.subTest(path=path):
+                response = await self.client.get(path, follow_redirects=True)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.url.path, '/')
+                self.assertEqual(
+                    [redirect.headers['location'] for redirect in response.history],
+                    ['/'] if path == '/login' else ['/login', '/'],
+                )
+                self.assertEqual(response.json()['template'], 'index.html')
+                self.assertTrue(response.json()['config']['loginMode'])
+                self.assertNotIn('synthetic-cookie-only', response.text)
+                self.assertEqual((await self.client.get('/api/config')).status_code, 401)
+        self.assertEqual(self.template_calls, ['index.html'] * 3)
+        self.assertEqual(self.config_reads, 0)
 
     async def test_anonymous_json_cookie_write_is_401_and_does_not_save(self):
         response = await self.client.post('/cookies', json={'chzzk': {'NID_AUT': 'synthetic'}})

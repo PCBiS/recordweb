@@ -1273,6 +1273,12 @@ async def index(request: Request):
         })
 
 
+# 로그인 폼은 메인 페이지에서 렌더링한다.
+@app.get("/login")
+async def loginPage():
+    return RedirectResponse(url='/', status_code=302)
+
+
 # 로그인 라우트
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
