@@ -20,6 +20,7 @@ from cryptography.fernet import Fernet
 from typing import Dict, Set, Optional
 
 from module.runtime_log import printOnce
+from module.storage_metrics import normalizeMonitorPaths
 
 base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -943,6 +944,7 @@ def loadConfig():
         "enableTray": False,
         "minimizeToTrayOnClose": False,
         "minimizeToTrayOnStart": False,
+        "systemMonitorPaths": [],
         "fileManagerEnabled": False,
         "fileManagerRoots": [],
         "fileManagerMode": "blacklist",
@@ -1033,6 +1035,9 @@ def loadConfig():
         merged["minimizeToTrayOnClose"] = False
         merged["minimizeToTrayOnStart"] = False
 
+    # 대시보드 저장소 경로: 비어 있으면 채널의 녹화 경로를 사용한다.
+    merged["systemMonitorPaths"] = normalizeMonitorPaths(merged.get("systemMonitorPaths", []))
+
     # 파일매니저 정규화
     roots = merged.get("fileManagerRoots", [])
     if isinstance(roots, str):
@@ -1072,11 +1077,15 @@ def loadConfig():
 
 # config.json 파일에서 데이터를 저장하는 함수
 def saveConfig(data):
+    if isinstance(data, dict) and "systemMonitorPaths" in data:
+        data = {**data, "systemMonitorPaths": normalizeMonitorPaths(data["systemMonitorPaths"])}
     try:
         disk = readJsonSafe(CONFIG_PATH, {})
         if not isinstance(disk, dict):
             disk = {}
         merged = {**disk, **(data or {})}
+        if "systemMonitorPaths" in merged:
+            merged["systemMonitorPaths"] = normalizeMonitorPaths(merged["systemMonitorPaths"])
         changed = writeJsonSafe(CONFIG_PATH, merged)
         if changed:
             print(f"[DEBUG] {CONFIG_PATH} 저장 완료.")

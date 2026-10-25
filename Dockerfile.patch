@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+
+# Keep the v1.2.9 runtime and its verified 2026-10-23 CA policy.
+ARG BASE_IMAGE=ghcr.io/pcbis/recordweb@sha256:25253c35e1e07dfa1234abbb01c173168d61c3f13506f7d099a5d16e0c479f0b
+FROM ${BASE_IMAGE} AS regression
+
+COPY recordWEB.py /app/recordWEB.py
+COPY module/file_manager.py module/data_manager.py module/storage_metrics.py /app/module/
+COPY templates/config.html /app/templates/config.html
+COPY templates/static/js/script.js /app/templates/static/js/script.js
+COPY tests/ /app/tests/
+
+RUN --network=none python3 -B -m unittest discover -s tests -p 'test_*.py' -v
+RUN --network=none \
+    --mount=type=bind,source=security/ca_policy.py,target=/tmp/ca_policy.py,ro \
+    python3 -I -B /tmp/ca_policy.py verify
+
+FROM ${BASE_IMAGE} AS runtime
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.version="1.2.9-patch-20261026" \
+      org.opencontainers.image.description="recordWEB v1.2.9 directory metrics and application security fixes" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+
+COPY --chmod=0644 --from=regression /app/recordWEB.py /app/recordWEB.py
+COPY --chmod=0644 --from=regression /app/module/file_manager.py /app/module/file_manager.py
+COPY --chmod=0644 --from=regression /app/module/data_manager.py /app/module/data_manager.py
+COPY --chmod=0644 --from=regression /app/module/storage_metrics.py /app/module/storage_metrics.py
+COPY --chmod=0644 --from=regression /app/templates/config.html /app/templates/config.html
+COPY --chmod=0644 --from=regression /app/templates/static/js/script.js /app/templates/static/js/script.js

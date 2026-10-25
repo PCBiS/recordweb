@@ -1,0 +1,157 @@
+name: Publish reviewed application patch
+
+on:
+  push:
+    branches: [codex/recordweb-release-20261026]
+
+permissions:
+  contents: read
+  packages: write
+
+# Serializes all attempts to publish this one immutable release tag.
+concurrency:
+  group: recordweb-app-patch-20261026
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/pcbis/recordweb
+  RELEASE_TAG: v1.2.9-patch-20261026
+  BASE_IMAGE: ghcr.io/pcbis/recordweb@sha256:25253c35e1e07dfa1234abbb01c173168d61c3f13506f7d099a5d16e0c479f0b
+
+jobs:
+  publish:
+    if: github.repository == 'PCBiS/recordweb' && github.ref == 'refs/heads/codex/recordweb-release-20261026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the reviewed source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test the release verifier's rejection paths
+        run: python3 -B -m unittest discover -s security -p 'test_app_patch_release.py' -v
+
+      - name: Log in to GHCR using the runner token
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Refuse an existing release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/require-unused-release-tag.sh" <<'GUARD'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_TAG" \
+              > "$RUNNER_TEMP/release-tag.json" 2> "$RUNNER_TEMP/release-tag.err"; then
+            echo "::error::The immutable release tag already exists; refusing to overwrite it."
+            exit 1
+          fi
+          if ! grep -Eq '(^|[[:space:]])not found([[:space:]]|$)|MANIFEST_UNKNOWN|manifest unknown' \
+              "$RUNNER_TEMP/release-tag.err"; then
+            cat "$RUNNER_TEMP/release-tag.err" >&2
+            echo "::error::Could not establish that the release tag is absent."
+            exit 1
+          fi
+          GUARD
+          bash "$RUNNER_TEMP/require-unused-release-tag.sh"
+          echo "CANDIDATE_TAG=candidate-app-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
+      - name: Build and push an isolated OCI candidate
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.patch
+          platforms: linux/amd64
+          push: true
+          pull: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.CANDIDATE_TAG }}
+          outputs: type=image,oci-mediatypes=true
+          build-args: SOURCE_REVISION=${{ github.sha }}
+          provenance: false
+          sbom: false
+
+      - name: Pull the exact candidate and pinned CA base
+        env:
+          CANDIDATE_DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "$BASE_IMAGE"
+          docker pull --platform linux/amd64 "$IMAGE_NAME@$CANDIDATE_DIGEST"
+          docker buildx imagetools inspect --raw "$IMAGE_NAME@$CANDIDATE_DIGEST" > "$RUNNER_TEMP/candidate.manifest.json"
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          payload = (Path(os.environ['RUNNER_TEMP']) / 'candidate.manifest.json').read_bytes()
+          document = json.loads(payload)
+          assert document['mediaType'] == 'application/vnd.oci.image.manifest.v1+json', 'Candidate is not a single OCI image manifest'
+          assert document['config']['mediaType'] == 'application/vnd.oci.image.config.v1+json'
+          assert 'sha256:' + hashlib.sha256(payload).hexdigest() == os.environ['CANDIDATE_DIGEST'], 'Raw candidate manifest digest differs from build output'
+          PY
+
+      - name: Audit final image graph, source, runtime metadata and CA preservation
+        env:
+          CANDIDATE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          python3 -B security/verify_app_patch.py \
+            --candidate "$IMAGE_NAME@$CANDIDATE_DIGEST" \
+            --revision "$GITHUB_SHA" --output "$RUNNER_TEMP/app-image-verification.json"
+
+      - name: Run all 31 regression tests against the pulled final image
+        env:
+          CANDIDATE_DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --no-healthcheck --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/app/tests,readonly" \
+            --entrypoint python3 "$IMAGE_NAME@$CANDIDATE_DIGEST" \
+            -B -m unittest discover -s tests -p 'test_*.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/app-regression.log"
+          grep -Eq '^Ran 31 tests in ' "$RUNNER_TEMP/app-regression.log"
+
+      - name: Verify existing CA policy in the pulled final image
+        env:
+          CANDIDATE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker run --rm --network none --no-healthcheck --read-only \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/security/ca_policy.py,dst=/tmp/ca_policy.py,readonly" \
+            --entrypoint python3 "$IMAGE_NAME@$CANDIDATE_DIGEST" \
+            -I -B /tmp/ca_policy.py verify
+
+      - name: Promote the exact verified manifest to the unused release tag
+        env:
+          CANDIDATE_DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash "$RUNNER_TEMP/require-unused-release-tag.sh"
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$IMAGE_NAME:$RELEASE_TAG" "$IMAGE_NAME@$CANDIDATE_DIGEST"
+          docker buildx imagetools inspect --raw "$IMAGE_NAME:$RELEASE_TAG" > "$RUNNER_TEMP/release.manifest.json"
+          cmp --silent "$RUNNER_TEMP/candidate.manifest.json" "$RUNNER_TEMP/release.manifest.json"
+          echo "Published $IMAGE_NAME:$RELEASE_TAG at $CANDIDATE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source: $GITHUB_SHA. All 31 final-image regressions, CA policy, native CA refresh, source hashes and runtime graph checks passed." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain release verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recordweb-app-patch-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/app-image-verification.json
+            ${{ runner.temp }}/app-regression.log
+            ${{ runner.temp }}/candidate.manifest.json
+            ${{ runner.temp }}/release.manifest.json
+          if-no-files-found: ignore
+          retention-days: 30

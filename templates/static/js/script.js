@@ -1047,6 +1047,7 @@ function _mkDiskTile(idx, d) {
   const t = document.createElement('span');
   t.className = 'tile-title';
   t.textContent = (d?.label || d?.mountpoint || d?.device || `Disk ${idx+1}`);
+  t.title = (d?.paths || [d?.mountpoint]).filter(Boolean).join('\n');
   const sub = document.createElement('span');
   sub.className = 'tile-sub';
   sub.textContent = (d?.fstype ? d.fstype.toUpperCase() : '');
@@ -1055,8 +1056,9 @@ function _mkDiskTile(idx, d) {
   const val = document.createElement('div');
   val.className = 'tile-value';
   val.id = `disk-value-${idx}`;
-  const pct = +(d?.percent || 0);
-  val.textContent = `${pct.toFixed(0)}%`;
+  const available = d?.available !== false;
+  const pct = available ? +(d?.percent || 0) : 0;
+  val.textContent = available ? `${pct.toFixed(0)}%` : '확인 불가';
 
   const prog = document.createElement('div');
   prog.className = 'progress';
@@ -1069,7 +1071,9 @@ function _mkDiskTile(idx, d) {
   const brief = document.createElement('div');
   brief.className = 'tile-brief';
   brief.id = `disk-brief-${idx}`;
-  brief.textContent = `${_fmtBytes(d?.used||0)} / ${_fmtBytes(d?.total||0)}`;
+  brief.textContent = available
+    ? `${_fmtBytes(d?.used||0)} / ${_fmtBytes(d?.total||0)}`
+    : '경로 또는 저장소에 접근할 수 없습니다.';
 
   host.appendChild(head);
   host.appendChild(val);
@@ -1082,14 +1086,14 @@ function _mkDiskTile(idx, d) {
 function _renderDisks(arr) {
   const [r1, r2] = _ensureDiskRows();
   if (!r1 || !r2) return;
-  const top10 = (arr || []).slice(0, 10);
-  const signature = top10.map((d) => `${d?.mountpoint || ""}|${d?.label || ""}|${d?.fstype || ""}`).join(";");
+  const displayed = Array.isArray(arr) ? arr : [];
+  const signature = JSON.stringify(displayed.map((d) => [d?.mountpoint, d?.label, d?.fstype, d?.paths, d?.available]));
 
   if (signature !== __sys_disk_signature) {
     __sys_disk_signature = signature;
     r1.replaceChildren();
     r2.replaceChildren();
-    top10.forEach((d, i) => {
+    displayed.forEach((d, i) => {
       const tile = _mkDiskTile(i, d);
       tile.id = `disk-tile-${i}`;
       if (i < 5) r1.appendChild(tile);
@@ -1097,19 +1101,24 @@ function _renderDisks(arr) {
     });
   }
 
-  top10.forEach((d, i) => {
-    const pct = +(d?.percent || 0);
-    document.getElementById(`disk-value-${i}`)?.replaceChildren(document.createTextNode(`${pct.toFixed(0)}%`));
+  displayed.forEach((d, i) => {
+    const available = d?.available !== false;
+    const pct = available ? +(d?.percent || 0) : 0;
+    document.getElementById(`disk-value-${i}`)?.replaceChildren(
+      document.createTextNode(available ? `${pct.toFixed(0)}%` : '확인 불가')
+    );
     const bar = document.getElementById(`disk-bar-${i}`);
     if (bar) bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
     document.getElementById(`disk-brief-${i}`)?.replaceChildren(
-      document.createTextNode(`${_fmtBytes(d?.used || 0)} / ${_fmtBytes(d?.total || 0)}`)
+      document.createTextNode(available
+        ? `${_fmtBytes(d?.used || 0)} / ${_fmtBytes(d?.total || 0)}`
+        : '경로 또는 저장소에 접근할 수 없습니다.')
     );
-    _setMetricLevel(`disk-tile-${i}`, pct, 75, 90);
+    _setMetricLevel(`disk-tile-${i}`, available ? pct : 100, 75, 90);
   });
 
   document.getElementById('disk-count')?.replaceChildren(
-    document.createTextNode(`${top10.length}개 드라이브`)
+    document.createTextNode(displayed.length ? `${displayed.length}개 저장소` : '녹화 저장 경로 없음')
   );
 }
 

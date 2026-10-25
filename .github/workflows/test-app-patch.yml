@@ -1,0 +1,35 @@
+name: Test application patch
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [codex/recordweb-storage-security-20261025]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Test and build the CA-preserving patch
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.patch
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: recordweb-patch:test
+          build-args: SOURCE_REVISION=${{ github.sha }}
+          provenance: false
+      - name: Verify CA policy in the final image
+        run: |
+          docker run --rm --network none --entrypoint python3 \
+            --mount "type=bind,src=$PWD/security/ca_policy.py,dst=/tmp/ca_policy.py,readonly" \
+            recordweb-patch:test -I -B /tmp/ca_policy.py verify
