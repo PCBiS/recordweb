@@ -10,8 +10,6 @@ import platform
 import threading
 import webbrowser
 import re
-import string
-import shutil
 import secrets
 from datetime import datetime
 from typing import Optional, Any, List, Dict
@@ -86,6 +84,7 @@ from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from module.storage_metrics import normalizeMonitorPaths, resolveMonitorPaths, collectStorageMetrics
 from werkzeug.security import generate_password_hash, check_password_hash
 from contextlib import asynccontextmanager, suppress
 
@@ -366,15 +365,24 @@ else:
 
 
 # 예외 처리기 정의
+def _wantsJsonResponse(request: Request) -> bool:
+    return (
+        request.url.path.startswith('/api/')
+        or request.url.path in {'/get_config', '/updateAccount'}
+        or 'application/json' in request.headers.get('accept', '').lower()
+        or request.headers.get('content-type', '').lower().startswith('application/json')
+    )
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    if exc.status_code == 401:
-        return RedirectResponse(url='/login')
-    else:
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"detail": exc.detail},
-        )
+    if exc.status_code == 401 and not _wantsJsonResponse(request):
+        return RedirectResponse(url='/login', status_code=302)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
 
 
 # 채널 상태 초기화 함수
@@ -403,10 +411,21 @@ async def requireLogin(request: Request):
         return True
     if request.session.get('logged_in'):
         return True
-    # API엔 401 JSON
-    if request.url.path.startswith('/api/') or 'application/json' in (request.headers.get('accept','')):
-        raise HTTPException(status_code=401, detail="Login required")
-    return RedirectResponse(url="/login", status_code=302)
+    # A dependency response value does not stop the route handler.
+    raise HTTPException(status_code=401, detail="Login required")
+
+
+async def requireFileManager(request: Request, login: Any = Depends(requireLogin)):
+    config = request.app.state.config
+    if not config.get('loginMode', False) or not config.get('fileManagerEnabled', False):
+        raise HTTPException(status_code=403, detail="File manager disabled")
+    return True
+
+
+async def requireWritableFileManager(request: Request, access: Any = Depends(requireFileManager)):
+    if request.app.state.config.get('fileManagerReadOnly', False):
+        raise HTTPException(status_code=403, detail="Read-only mode")
+    return True
 
 
 # 자동 녹화 모드 함수
@@ -645,46 +664,26 @@ def _getCpuName():
 # 전역 표시용(1회 평가 후 캐시)
 cpu_name = _getCpuName()
 
-# 시스템 모니터링은 짧은 주기로 반복 호출되므로 측정 결과와 디스크 목록을 재사용합니다.
+# 시스템 모니터링은 짧은 주기로 반복 호출되므로 측정 결과를 재사용합니다.
 _SYS_METRICS_LOCK = threading.Lock()
 _SYS_METRICS_CACHE = {"at": 0.0, "data": None}
 _SYS_METRICS_CACHE_TTL = 2.5
-_SYS_DISK_PARTS_CACHE = {"at": 0.0, "parts": []}
-_SYS_DISK_PARTS_TTL = 60.0
 _SYS_NET_PREV = psutil.net_io_counters(pernic=False)
 _SYS_NET_PREV_AT = time.monotonic()
 psutil.cpu_percent(interval=None)
 
 
-# 대시보드 디스크 라벨 정리
-def _shortDiskLabel(p):
-    raw_mp = (p.mountpoint or "").strip()
-    mp = raw_mp if raw_mp == os.sep else raw_mp.rstrip(os.sep)
-    fs = (p.fstype or "").upper()
-
-    if os.name == "nt":
-        label = mp.upper() if (len(mp) >= 2 and mp[1] == ":") else (p.device or mp)
-    else:
-        if mp in ("/", "/home", "/boot"):
-            label = mp
-        elif mp.startswith("/sys/fs/cgroup/"):
-            parts = [x for x in mp.split("/") if x]
-            label = "cgroup/" + (parts[3] if len(parts) > 3 else "")
-        elif len(mp) > 16:
-            base = os.path.basename(mp)
-            label = base if base else mp
-        else:
-            label = mp
-    return label
-
-
-def _collectSysMetrics() -> dict:
+def _collectSysMetrics(config: dict, channels: List[dict]) -> dict:
     global _SYS_NET_PREV, _SYS_NET_PREV_AT
 
+    paths = resolveMonitorPaths(config, channels)
+    path_key = tuple(paths)
     now = time.monotonic()
     with _SYS_METRICS_LOCK:
         cached = _SYS_METRICS_CACHE.get("data")
-        if cached is not None and now - float(_SYS_METRICS_CACHE.get("at") or 0.0) < _SYS_METRICS_CACHE_TTL:
+        if (cached is not None
+                and _SYS_METRICS_CACHE.get("paths") == path_key
+                and now - float(_SYS_METRICS_CACHE.get("at") or 0.0) < _SYS_METRICS_CACHE_TTL):
             return cached
 
         cpu_pct = float(psutil.cpu_percent(interval=None))
@@ -697,63 +696,7 @@ def _collectSysMetrics() -> dict:
         _SYS_NET_PREV = net
         _SYS_NET_PREV_AT = now
 
-        if now - float(_SYS_DISK_PARTS_CACHE.get("at") or 0.0) >= _SYS_DISK_PARTS_TTL:
-            try:
-                parts = psutil.disk_partitions(all=True)
-            except Exception:
-                parts = []
-            _SYS_DISK_PARTS_CACHE["at"] = now
-            _SYS_DISK_PARTS_CACHE["parts"] = parts
-        else:
-            parts = _SYS_DISK_PARTS_CACHE.get("parts") or []
-
-        disks = []
-        seen = set()
-        ephemeral = {"tmpfs", "proc", "sysfs", "cgroup", "cgroup2", "squashfs", "devpts", "overlay"}
-
-        for part in parts:
-            mountpoint = (part.mountpoint or "").strip()
-            if not mountpoint or mountpoint in seen:
-                continue
-            if (part.fstype or "").lower() in ephemeral and mountpoint not in ("/", "/home", "/boot"):
-                continue
-
-            try:
-                usage = psutil.disk_usage(mountpoint)
-            except Exception:
-                continue
-
-            seen.add(mountpoint)
-            disks.append({
-                "device": part.device or mountpoint,
-                "mountpoint": mountpoint,
-                "label": _shortDiskLabel(part),
-                "fstype": (part.fstype or "").lower(),
-                "total": int(usage.total),
-                "used": int(usage.used),
-                "free": int(usage.free),
-                "percent": float(usage.percent),
-            })
-
-        if not disks and os.name == "nt":
-            for letter in string.ascii_uppercase:
-                root = f"{letter}:\\"
-                if not os.path.exists(root):
-                    continue
-                try:
-                    usage = shutil.disk_usage(root)
-                except Exception:
-                    continue
-                disks.append({
-                    "device": root,
-                    "mountpoint": root,
-                    "label": root,
-                    "fstype": "",
-                    "total": int(usage.total),
-                    "used": int(usage.used),
-                    "free": int(usage.free),
-                    "percent": float((usage.used / usage.total * 100.0) if usage.total else 0.0),
-                })
+        disks = collectStorageMetrics(paths, BASE_DIR)
 
         data = {
             "cpu": {
@@ -773,11 +716,12 @@ def _collectSysMetrics() -> dict:
                 "bytes_sent": int(net.bytes_sent),
                 "bytes_recv": int(net.bytes_recv),
             },
-            "disks": disks[:10],
+            "disks": disks,
             "sampled_at": time.time(),
         }
         _SYS_METRICS_CACHE["at"] = now
         _SYS_METRICS_CACHE["data"] = data
+        _SYS_METRICS_CACHE["paths"] = path_key
         return data
 
 
@@ -1288,9 +1232,12 @@ async def toggle_record_enabled(channel_id: str, request: Request, login: Any = 
 
 # 웹 대시보드에 매트릭 API
 @app.get("/api/sys_metrics")
-async def api_sys_metrics():
+async def api_sys_metrics(request: Request, login: Any = Depends(requireLogin)):
     try:
-        return JSONResponse(content=await asyncio.to_thread(_collectSysMetrics))
+        config = {"systemMonitorPaths": normalizeMonitorPaths(request.app.state.config.get("systemMonitorPaths", []))}
+        async with request.app.state.channels_lock:
+            channels = [{"output_dir": c.get("output_dir")} for c in request.app.state.channels]
+        return JSONResponse(content=await asyncio.to_thread(_collectSysMetrics, config, channels))
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[SYS_METRICS][ERROR] {e}\n{tb}")
@@ -1433,14 +1380,11 @@ async def updateAccount(
     current_password: str = Form(...), 
     new_password: str = Form(None), 
     new_password_confirm: str = Form(None), 
-    action: str = Form(...)
+    action: str = Form(...),
+    login: Any = Depends(requireLogin)
 ):
     try:
         account = loadAccount()  # 계정 정보 로드
-
-        # 로그를 추가하여 디버깅
-        print(f"Received request for action: {action}")
-        print(f"Username: {username}, Current Password: {current_password}, Action: {action}")
 
         if action == "update":  # 계정 수정
             if account:
@@ -1450,7 +1394,7 @@ async def updateAccount(
                         content={"status": "error", "message": "기존 비밀번호가 일치하지 않습니다."},
                         status_code=400
                     )
-                if new_password != new_password_confirm:
+                if not new_password or new_password != new_password_confirm:
                     return JSONResponse(
                         content={"status": "error", "message": "새 비밀번호가 일치하지 않습니다."},
                         status_code=400
@@ -1470,8 +1414,6 @@ async def updateAccount(
                 )
 
         elif action == "delete":  # 계정 삭제
-            print(f"Attempting to delete account: {username}")
-
             # 삭제는 username과 current_password만 필요
             if account and check_password_hash(account['password'], current_password):
                 if os.path.exists(LOGIN_PATH):
@@ -1491,10 +1433,14 @@ async def updateAccount(
                     content={"status": "error", "message": "기존 비밀번호가 일치하지 않습니다."},
                     status_code=400
                 )
-    except Exception as e:
-        print(f"Exception: {str(e)}")  # 예외 발생 시 디버그 메시지 출력
         return JSONResponse(
-            content={"status": "error", "message": f"계정 처리 중 오류 발생: {str(e)}"},
+            content={"status": "error", "message": "처리할 수 없는 계정 요청입니다."},
+            status_code=400,
+        )
+    except Exception as e:
+        print(f"[ACCOUNT][ERROR] Account operation failed ({type(e).__name__})")
+        return JSONResponse(
+            content={"status": "error", "message": "계정 처리 중 오류가 발생했습니다."},
             status_code=500
         )
 
@@ -1839,7 +1785,7 @@ async def filesPage(request: Request, login: Any = Depends(requireLogin)):
 
 # 사용량/목록 API
 @app.get("/api/files/usage")
-async def api_files_usage(request: Request, login: Any = Depends(requireLogin)):
+async def api_files_usage(request: Request, login: Any = Depends(requireFileManager)):
     cfg = request.app.state.config
     async with request.app.state.channels_lock:
         roots = buildAllowedRoots(cfg, request.app.state.channels)
@@ -1852,7 +1798,7 @@ async def api_files_list(
     request: Request,
     path: str,
     show_hidden: bool = Query(False),
-    login: Any = Depends(requireLogin)
+    login: Any = Depends(requireFileManager)
 ):
     cfg = request.app.state.config
     async with request.app.state.channels_lock:
@@ -1868,7 +1814,7 @@ async def api_files_list(
 
 # 루트 목록
 @app.get("/api/files/roots")
-async def api_files_roots(request: Request, login: Any = Depends(requireLogin)):
+async def api_files_roots(request: Request, login: Any = Depends(requireFileManager)):
     cfg = request.app.state.config
     if not cfg.get("fileManagerEnabled", False):
         raise HTTPException(status_code=403, detail="File manager disabled")
@@ -1893,7 +1839,7 @@ async def api_files_ls(
     request: Request,
     path: str,
     show_hidden: bool = Query(False),
-    login: Any = Depends(requireLogin)
+    login: Any = Depends(requireFileManager)
 ):
     cfg = request.app.state.config
     async with request.app.state.channels_lock:
@@ -1933,7 +1879,7 @@ async def api_files_ls(
 
 # 디스크 사용량
 @app.get("/api/files/disk-usage")
-async def api_files_disk_usage(request: Request, paths: List[str] = Query(default=None), login: Any = Depends(requireLogin)):
+async def api_files_disk_usage(request: Request, paths: List[str] = Query(default=None), login: Any = Depends(requireFileManager)):
     cfg = request.app.state.config
     if paths:
         roots = [p for p in paths if os.path.isdir(p)]
@@ -1957,7 +1903,7 @@ async def api_files_disk_usage(request: Request, paths: List[str] = Query(defaul
 
 # 4) 파일 다운로드 
 @app.get("/api/files/download")
-async def api_files_download(request: Request, path: str, login: Any = Depends(requireLogin)):
+async def api_files_download(request: Request, path: str, login: Any = Depends(requireFileManager)):
     async with request.app.state.channels_lock:
         roots = buildAllowedRoots(request.app.state.config, request.app.state.channels)
 
@@ -1972,7 +1918,7 @@ async def api_files_download(request: Request, path: str, login: Any = Depends(r
 
 # 경로 만들기 API
 @app.post("/api/files/mkdir")
-async def api_files_mkdir(request: Request, body: dict = Body(...), login: Any = Depends(requireLogin)):
+async def api_files_mkdir(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):
     if request.app.state.config.get("fileManagerReadOnly", False):
         raise HTTPException(status_code=403, detail="Read-only mode")
     parent  = body.get("path")
@@ -1983,13 +1929,18 @@ async def api_files_mkdir(request: Request, body: dict = Body(...), login: Any =
     async with request.app.state.channels_lock:
         roots = buildAllowedRoots(request.app.state.config, request.app.state.channels)
     parent = ensureInRoots(parent, roots)
-    created = mkdirPath(parent, newName)
+    try:
+        created = mkdirPath(parent, newName, roots)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid new_name")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="outside allowed roots")
     return {"status":"ok", "created": created}
 
 
 # 경로 수정 API
 @app.post("/api/files/rename")
-async def api_files_rename(request: Request, body: dict = Body(...), login: Any = Depends(requireLogin)):
+async def api_files_rename(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):
     if request.app.state.config.get("fileManagerReadOnly", False):
         raise HTTPException(status_code=403, detail="Read-only mode")
     src = body.get("path"); newName = body.get("new_name")
@@ -2000,13 +1951,18 @@ async def api_files_rename(request: Request, body: dict = Body(...), login: Any 
         busy  = busyFilePaths(recorder_manager, request.app.state.channels)
     src = ensureInRoots(src, roots)
     if isLocked(src, busy): raise HTTPException(status_code=423, detail="Locked (recording)")
-    dst = renamePath(src, newName)
+    try:
+        dst = renamePath(src, newName, roots)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid new_name")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="outside allowed roots")
     return {"status":"ok", "path": dst}
 
 
 # 파일 이동 API
 @app.post("/api/files/move")
-async def api_files_move(request: Request, body: dict = Body(...), login: Any = Depends(requireLogin)):
+async def api_files_move(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):
     if request.app.state.config.get("fileManagerReadOnly", False):
         raise HTTPException(status_code=403, detail="Read-only mode")
 
@@ -2031,7 +1987,7 @@ async def api_files_move(request: Request, body: dict = Body(...), login: Any = 
 
 # 파일 삭제 API
 @app.post("/api/files/delete")
-async def api_files_delete(request: Request, body: dict = Body(...), login: Any = Depends(requireLogin)):
+async def api_files_delete(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):
     if request.app.state.config.get("fileManagerReadOnly", False):
         raise HTTPException(status_code=403, detail="Read-only mode")
 
@@ -2073,7 +2029,7 @@ async def api_files_delete(request: Request, body: dict = Body(...), login: Any 
 async def api_files_streamcopy(
     request: Request,
     body: dict = Body(...),
-    login: Any = Depends(requireLogin),
+    login: Any = Depends(requireWritableFileManager),
 ):
     # 읽기전용 모드 차단
     if request.app.state.config.get("fileManagerReadOnly", False):
@@ -2178,7 +2134,7 @@ async def configPage(request: Request, login: Any = Depends(requireLogin)):
 
 
 @app.get("/api/config")
-async def get_config_api():
+async def get_config_api(request: Request, login: Any = Depends(requireLogin)):
     return loadConfig()
 
 
@@ -2229,6 +2185,7 @@ async def updateConfig(
     audio_bitrate_gpu1: Optional[str] = Form(None),
     gpuAssignmentsJson: Optional[str] = Form(None),
     loginMode: Optional[str] = Form(None),
+    systemMonitorPaths: Optional[str] = Form(None),
     fileManagerEnabled: Optional[str] = Form(None),
     fileManagerRoots: List[str] = Form([]),
     fileManagerMode: str = Form("blacklist"),
@@ -2258,6 +2215,11 @@ async def updateConfig(
     try:
         # 1) 기존 설정 로드
         current_config = loadConfig() or {}
+        posted_form = await request.form()
+        monitor_paths = normalizeMonitorPaths(
+            (systemMonitorPaths or "") if "systemMonitorPaths" in posted_form
+            else current_config.get("systemMonitorPaths", [])
+        )
 
         # 2) 플러그인/시프트
         posted_plugin = (plugin_type or "").strip().lower() if plugin_type is not None else None
@@ -2439,6 +2401,7 @@ async def updateConfig(
             "audio_codec_gpu1":             _ac1,
             "audio_bitrate_gpu1":           _ab1, 
             "loginMode":                    toBool(loginMode),
+            "systemMonitorPaths":           monitor_paths,
             "fileManagerEnabled":           effective_fm_enabled,
             "fileManagerRoots":             normalized_roots,
             "fileManagerMode":              fileManagerMode if fileManagerMode in ("blacklist","whitelist") else "blacklist",
@@ -2580,7 +2543,7 @@ async def updateConfig(
 
 
 @app.get("/get_config")
-async def get_config(request: Request):
+async def get_config(request: Request, login: Any = Depends(requireLogin)):
     try:
         return {"status": "success", "config": request.app.state.config}
     except Exception as e:

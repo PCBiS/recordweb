@@ -743,6 +743,18 @@
 
             <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
 
+            <h3>대시보드 저장 공간</h3>
+            <label for="systemMonitorPaths">표시할 저장 경로</label>
+            <textarea id="systemMonitorPaths" name="systemMonitorPaths" rows="3"
+                      placeholder="예: /recordings">{{ (config.systemMonitorPaths or [])|join('\n') }}</textarea>
+            <p class="description">
+              한 줄에 하나씩 입력합니다. 비워 두면 채널의 녹화 경로를 사용합니다.
+              각 경로가 속한 저장소의 전체·사용·가용 공간을 표시하며, 같은 저장소는 한 번만 표시합니다.
+              폴더 안 파일 크기의 합계나 파일매니저 접근 권한은 변경하지 않습니다.
+            </p>
+
+            <hr style="border: none; border-top: 2px dashed #000; margin: 20px 0;">
+
             <!-- 파일 관리 폼 -->
             <h3>파일 관리(웹 파일매니저)</h3>
 

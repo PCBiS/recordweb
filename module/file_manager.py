@@ -1,4 +1,5 @@
 import os
+import ntpath
 import shutil 
 import time
 import subprocess
@@ -238,14 +239,43 @@ def streamCopyFile(src: str) -> str:
     return dst
 
 
-def renamePath(src: str, newName: str) -> str:
-    dst = os.path.join(os.path.dirname(src), newName)
+def validateEntryName(name: str) -> str:
+    """Accept one filename component, never a path on either supported OS."""
+    if (
+        not isinstance(name, str)
+        or not name
+        or name in {'.', '..'}
+        or '/' in name
+        or '\\' in name
+        or ntpath.splitdrive(name)[0]
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in name)
+    ):
+        raise ValueError('new_name must be a single filename')
+    if os.name == 'nt':
+        stem = name.split('.', 1)[0].rstrip(' ').upper()
+        reserved = {'CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$'}
+        reserved.update(f'{prefix}{i}' for prefix in ('COM', 'LPT') for i in range(1, 10))
+        if ':' in name or name.endswith((' ', '.')) or stem in reserved:
+            raise ValueError('new_name is not a regular Windows filename')
+    return name
+
+
+def childDestination(parent: str, name: str, allowedRoots: List[str] = None) -> str:
+    dst = os.path.join(normPath(parent), validateEntryName(name))
+    if allowedRoots is not None:
+        # Includes existing symlinks at the destination, not just the parent.
+        ensureInRoots(dst, allowedRoots)
+    return dst
+
+
+def renamePath(src: str, newName: str, allowedRoots: List[str] = None) -> str:
+    dst = childDestination(os.path.dirname(src), newName, allowedRoots)
     os.replace(src, dst)
     return dst
 
 
-def mkdirPath(parent: str, name: str) -> str:
-    p = os.path.join(parent, name)
+def mkdirPath(parent: str, name: str, allowedRoots: List[str] = None) -> str:
+    p = childDestination(parent, name, allowedRoots)
     os.makedirs(p, exist_ok=True)
     return p
 
