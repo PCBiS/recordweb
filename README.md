@@ -1,5 +1,7 @@
 # recordWEB Docker
 
+Docker 실행 지원·회전 로그·수동/자동 진단과 원본/패치 분리 버전은 [RUNTIME.md](RUNTIME.md)를 참고하세요. 새 버전은 `Dockerfile.runtime`을 사용하며 기존 일반 빌드와 구분합니다.
+
 recordWEB v1.2.9를 Linux Docker 컨테이너에서 실행하기 위한 프로젝트입니다.
 
 CA 수정 버전 `ghcr.io/pcbis/recordweb:v1.2.9-ca-20261023`의 기반 이미지·변경 범위·검증과 사용 방법은 [CA 릴리스 기록](CA-RELEASE.md)을 확인하세요. 이 버전은 AMD64 전용이며 기존 `latest`와 `v1.2.9` 태그는 유지합니다.

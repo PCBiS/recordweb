@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>채널관리</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">  
+</head>
+<body class="page-channels">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <h2>내맘대로 자동녹화 웹UI<span class="chip chip--ver">{{ program_version }}</span></h2>
+      </div>
+    </div>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+        
+        {% if loginMode %}
+            {% if request.session.get('logged_in') %}
+                <!-- 로그인된 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+
+                <!-- 로그인 정보와 로그아웃 링크 -->
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <!-- 로그인되지 않은 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <!-- 로그인 모드가 꺼져 있을 때 메뉴 표시 -->
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+
+            <!-- 로그인 정보와 로그아웃 링크 -->
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+
+    <div id="content">
+      <h1>채널 관리</h1>
+      <form id="addChannelForm" method="post" action="/api/channels">
+        <!-- 채널 추가 폼 (플랫폼, 채널 ID, 채널명, 저장 경로, 품질, 확장자 등) -->
+        <label for="platform">플랫폼</label>
+        <select id="platform" name="platform" required>
+          <option value="chzzk">치지직</option>
+          <option value="cime">씨미</option>
+        </select>
+        <label for="channelId">채널 ID</label>
+        <p class="field-desc">
+          • chzzk.naver.com/live/UID 에서 <code>UID</code>만 입력하세요<br>
+          • ci.me/@abc/live 에서 @를 제외한 <code>abc</code>만 입력하세요
+        </p>
+        <input type="text" id="channelId" name="channelId" required>
+
+        <label for="channelName">채널명</label>
+        <p class="field-desc">
+          사용자가 원하는 채널명으로 작성해주세요
+        </p>
+        <input type="text" id="channelName" name="channelName" required>
+
+        <label for="outputDir">저장 경로</label>
+        <p class="field-desc">
+          사용자가 원하는 경로를 직접 입력해주세요<br>
+          입력 예시: <code>D:/test</code>
+        </p>
+        <input type="text" id="outputDir" name="outputDir" required>
+
+        <label for="quality">품질</label>
+        <p class="field-desc">
+          현재 녹화 가능한 최대 품질을 자동으로 설정하려면 <code>best</code>를 선택해주세요
+        </p>
+        <select id="quality" name="quality" required></select>
+
+        <label for="extension">파일 확장자</label>
+        <p class="field-desc">
+          • 치지직: <code>.ts</code> 또는 <code>.mp4</code> 선택 가능하지만<br>
+          • 씨미: <code>.mp4</code>로 자동 고정됩니다
+        </p>
+        <select id="extension" name="extension" required></select>
+
+        <label for="recordWatchParty">같이보기만 녹화</label>
+        <p class="field-desc">
+          치지직의 같이보기 콘텐츠만 녹화합니다<br>
+          씨미에서는 사용할 수 없습니다
+        </p>
+        <select id="recordWatchParty" name="recordWatchParty" required>
+          <option value="false">아니오</option>
+          <option value="true">예</option>
+        </select>
+
+        <label for="watchPartyExcludeTags">녹화 제외할 태그</label>
+        <p class="field-desc">같이보기만 녹화 사용시 녹화 제외할 태그를 입력해주세요. <br>2개 이상은 쉼표로 구분할하여 작성가능합니다
+        </p>
+        <input type="text" id="watchPartyExcludeTags" name="watchPartyExcludeTags" placeholder="예: LCK, VCT" disabled>
+
+        <button type="submit">채널 추가</button>
+      </form>
+      <br><br>
+      
+      <!-- 채널 목록을 카드 형태로 보여줍니다. -->
+      <div class="channel-list">
+        {% for channel in channels %}
+        <div class="channel-card"
+             data-quality="{{ channel.quality }}"
+             data-extension="{{ channel.extension }}">
+
+          <!-- (A) 저장된 채널값 바디 -->
+          <div class="channel-card-body">
+            <h3 class="channel-name">{{ channel.name }}</h3>
+            <p class="channel-output">저장 경로: {{ channel.output_dir }}</p>
+            <p class="channel-quality">품질: {{ channel.quality }} / 확장자: {{ channel.extension }}</p>
+          </div>
+
+          <!-- (B) 편집 폼 (처음부터 display:block) -->
+          <div class="channel-edit-form" style="display: block;">
+            <label>플랫폼</label>
+            <select class="edit-platform">
+              <option value="chzzk" {% if channel.platform == "chzzk" %}selected{% endif %}>치지직</option>
+              <option value="cime" {% if channel.platform == "cime" %}selected{% endif %}>씨미</option>
+            </select>
+
+            <label>채널명</label>
+            <input type="text" class="edit-channel-name" value="{{ channel.name }}">
+
+            <label>저장 경로</label>
+            <input type="text" class="edit-output-dir" value="{{ channel.output_dir }}">
+
+            <label>품질</label>
+            <select class="edit-quality"></select>
+
+            <label>확장자</label>
+            <select class="edit-extension"></select>
+
+            <label>같이보기만 녹화</label>
+            <select class="edit-recordWatchParty">
+              <option value="true" {% if channel.recordWatchParty == true %}selected{% endif %}>예</option>
+              <option value="false" {% if channel.recordWatchParty is not defined or channel.recordWatchParty == false %}selected{% endif %}>아니오</option>
+            </select>
+
+            <label>녹화 제외할 태그</label>
+            <input type="text" class="edit-watchPartyExcludeTags"
+                   value="{{ ', '.join(channel.watchPartyExcludeTags) if channel.watchPartyExcludeTags else '' }}">
+
+            <div class="button-row">
+              <button class="edit-channel" data-id="{{ channel.id }}">저장</button>
+              <button class="delete-channel" data-id="{{ channel.id }}">삭제</button>
+            </div>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+</body>
+</html>

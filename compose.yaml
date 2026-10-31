@@ -4,6 +4,7 @@ services:
     pull_policy: always
     container_name: recordweb
     init: true
+    stop_grace_period: 60s
     restart: unless-stopped
     environment:
       TZ: Asia/Seoul
@@ -12,3 +13,4 @@ services:
     volumes:
       - ./data/json:/app/json
       - ./recordings:/recordings
+      - ./logs:/var/log/recordweb

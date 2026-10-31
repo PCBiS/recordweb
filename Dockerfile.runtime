@@ -1,0 +1,30 @@
+# Reuse the reviewed dependency/CA release; this change adds no packages.
+FROM ghcr.io/pcbis/recordweb@sha256:17d31a3fa2c0451ac95c4d84a07949153aab9be9874d397ed6c6f9d03a36b981 AS supported
+
+COPY upstream/ /opt/recordweb-upstream/
+COPY patches/ /opt/recordweb-patches/
+COPY docker_support/ /opt/recordweb-docker/docker_support/
+RUN python /opt/recordweb-docker/docker_support/compose_source.py \
+      --upstream /opt/recordweb-upstream --output /tmp/recordweb-execution \
+      --baseline /opt/recordweb-patches/upstream.json --patches /opt/recordweb-patches/public.json \
+    && cp -a /tmp/recordweb-execution/. /app/ \
+    && rm -r /tmp/recordweb-execution \
+    && chmod 755 /opt/recordweb-docker/docker_support/entrypoint.sh
+
+FROM supported AS regression
+COPY tests/ /app/tests/
+COPY upstream/ /app/upstream/
+COPY patches/ /app/patches/
+COPY docker_support/ /app/docker_support/
+RUN --network=none python -B -m unittest discover -s tests -p 'test_*.py' -v
+
+FROM supported AS runtime
+COPY --from=regression /app/docker-build-manifest.json /app/docker-build-manifest.json
+ARG SOURCE_REVISION
+ENV RECORDWEB_LOG_DIR=/var/log/recordweb \
+    PYTHONFAULTHANDLER=1
+LABEL org.opencontainers.image.version="1.2.9-runtime-20261031" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}"
+VOLUME ["/var/log/recordweb"]
+ENTRYPOINT ["/opt/recordweb-docker/docker_support/entrypoint.sh"]
+CMD ["python", "recordWEB.py"]

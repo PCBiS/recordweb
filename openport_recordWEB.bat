@@ -1,81 +1,81 @@
 @echo off
 SETLOCAL
 
-:: °ü¸®ÀÚ ±ÇÇÑ È®ÀÎ
+:: ê´€ë¦¬ìž ê¶Œí•œ í™•ì¸
 openfiles >nul 2>&1
 if '%errorlevel%' NEQ '0' (
-    echo °ü¸®ÀÚ ±ÇÇÑÀÌ ÇÊ¿äÇÕ´Ï´Ù.
-    echo ÀÌ ½ºÅ©¸³Æ®¸¦ °ü¸®ÀÚ ±ÇÇÑÀ¸·Î ½ÇÇàÇØÁÖ¼¼¿ä.
+    echo ê´€ë¦¬ìž ê¶Œí•œì´ í•„ìš”í•©ë‹ˆë‹¤.
+    echo ì´ ìŠ¤í¬ë¦½íŠ¸ë¥¼ ê´€ë¦¬ìž ê¶Œí•œìœ¼ë¡œ ì‹¤í–‰í•´ì£¼ì„¸ìš”.
     pause
     exit /b
 )
 
-:: »ç¿ëÀÚ·ÎºÎÅÍ »õ·Î¿î Æ÷Æ® ¹øÈ£¸¦ ÀÔ·Â¹ÞÀ½
-set /p port="»ç¿ëÀÚ°¡ ¿øÇÏ´Â Æ÷Æ®¹øÈ£¸¦ ÀÔ·ÂÇØÁÖ¼¼¿ä(49152-65535¹ø ¹üÀ§ ±ÇÀå): "
+:: ì‚¬ìš©ìžë¡œë¶€í„° ìƒˆë¡œìš´ í¬íŠ¸ ë²ˆí˜¸ë¥¼ ìž…ë ¥ë°›ìŒ
+set /p port="ì‚¬ìš©ìžê°€ ì›í•˜ëŠ” í¬íŠ¸ë²ˆí˜¸ë¥¼ ìž…ë ¥í•´ì£¼ì„¸ìš”(49152-65535ë²ˆ ë²”ìœ„ ê¶Œìž¥): "
 
-:: Æ÷Æ® ¹øÈ£°¡ ÀÔ·ÂµÇÁö ¾Ê¾Ò´ÂÁö È®ÀÎ
+:: í¬íŠ¸ ë²ˆí˜¸ê°€ ìž…ë ¥ë˜ì§€ ì•Šì•˜ëŠ”ì§€ í™•ì¸
 if not defined port (
-    echo Æ÷Æ® ¹øÈ£°¡ ÀÔ·ÂµÇÁö ¾Ê¾Ò½À´Ï´Ù.
+    echo í¬íŠ¸ ë²ˆí˜¸ê°€ ìž…ë ¥ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.
     pause
     exit /b
 )
 
-:: Æ÷Æ® ¹øÈ£°¡ ¼ýÀÚÀÎÁö È®ÀÎ (set /a »ç¿ë)
+:: í¬íŠ¸ ë²ˆí˜¸ê°€ ìˆ«ìžì¸ì§€ í™•ì¸ (set /a ì‚¬ìš©)
 set /a testPort=%port% >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Æ÷Æ® ¹øÈ£´Â ¼ýÀÚ¿©¾ß ÇÕ´Ï´Ù.
+    echo í¬íŠ¸ ë²ˆí˜¸ëŠ” ìˆ«ìžì—¬ì•¼ í•©ë‹ˆë‹¤.
     pause
     exit /b
 )
 
-:: config.jsonÀÇ °æ·Î¸¦ ¹èÄ¡ÆÄÀÏÀÌ ÀÖ´Â À§Ä¡¸¦ ±âÁØÀ¸·Î ¼³Á¤
+:: config.jsonì˜ ê²½ë¡œë¥¼ ë°°ì¹˜íŒŒì¼ì´ ìžˆëŠ” ìœ„ì¹˜ë¥¼ ê¸°ì¤€ìœ¼ë¡œ ì„¤ì •
 set "config_path=%~dp0json\config.json"
 
-:: config.json ÆÄÀÏÀÌ Á¸ÀçÇÏ´ÂÁö È®ÀÎ
+:: config.json íŒŒì¼ì´ ì¡´ìž¬í•˜ëŠ”ì§€ í™•ì¸
 if not exist "%config_path%" (
-    echo config.json ÆÄÀÏÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù: %config_path%
+    echo config.json íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤: %config_path%
     pause
     exit /b
 )
 
-:: config.json ÆÄÀÏ ¹é¾÷
+:: config.json íŒŒì¼ ë°±ì—…
 copy "%config_path%" "%config_path%.bak" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo config.json ÆÄÀÏÀÇ ¹é¾÷ »ý¼º¿¡ ½ÇÆÐÇß½À´Ï´Ù.
+    echo config.json íŒŒì¼ì˜ ë°±ì—… ìƒì„±ì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.
     pause
     exit /b
 )
 
-:: PowerShell ¸í·ÉÀ» ÇÑ ÁÙ·Î Ã³¸®
-powershell -Command "try { $configPath = '%config_path%'; $config = Get-Content $configPath -Raw | ConvertFrom-Json; if (-not $config.PSObject.Properties['port']) { $config | Add-Member -NotePropertyName 'port' -NotePropertyValue %port% -Force; } else { $config.port = %port%; }; $config | ConvertTo-Json -Depth 10 | Set-Content $configPath; } catch { Write-Host '¿À·ù ¹ß»ý: ' $_.Exception.Message; exit 1 }"
+:: PowerShell ëª…ë ¹ì„ í•œ ì¤„ë¡œ ì²˜ë¦¬
+powershell -Command "try { $configPath = '%config_path%'; $config = Get-Content $configPath -Raw | ConvertFrom-Json; if (-not $config.PSObject.Properties['port']) { $config | Add-Member -NotePropertyName 'port' -NotePropertyValue %port% -Force; } else { $config.port = %port%; }; $config | ConvertTo-Json -Depth 10 | Set-Content $configPath; } catch { Write-Host 'ì˜¤ë¥˜ ë°œìƒ: ' $_.Exception.Message; exit 1 }"
 
 if %errorlevel% neq 0 (
-    echo config.json ÆÄÀÏÀ» ¾÷µ¥ÀÌÆ®ÇÏ´Â µ¿¾È ¿À·ù°¡ ¹ß»ýÇß½À´Ï´Ù.
+    echo config.json íŒŒì¼ì„ ì—…ë°ì´íŠ¸í•˜ëŠ” ë™ì•ˆ ì˜¤ë¥˜ê°€ ë°œìƒí–ˆìŠµë‹ˆë‹¤.
     pause
     exit /b
 )
 
-echo Æ÷Æ® ¹øÈ£ %port%°¡ config.json¿¡ ¼º°øÀûÀ¸·Î ÀúÀåµÇ¾ú½À´Ï´Ù.
+echo í¬íŠ¸ ë²ˆí˜¸ %port%ê°€ config.jsonì— ì„±ê³µì ìœ¼ë¡œ ì €ìž¥ë˜ì—ˆìŠµë‹ˆë‹¤.
 
-:: ¹æÈ­º® ±ÔÄ¢ÀÌ ÀÌ¹Ì Á¸ÀçÇÏ´ÂÁö È®ÀÎ
+:: ë°©í™”ë²½ ê·œì¹™ì´ ì´ë¯¸ ì¡´ìž¬í•˜ëŠ”ì§€ í™•ì¸
 netsh advfirewall firewall show rule name="Allow recordWEB port" >nul 2>&1
 if '%errorlevel%'=='0' (
-    echo "Allow recordWEB port" ±ÔÄ¢ÀÌ ÀÌ¹Ì Á¸ÀçÇÕ´Ï´Ù. ±âÁ¸ ±ÔÄ¢À» ¼öÁ¤ÇÕ´Ï´Ù...
+    echo "Allow recordWEB port" ê·œì¹™ì´ ì´ë¯¸ ì¡´ìž¬í•©ë‹ˆë‹¤. ê¸°ì¡´ ê·œì¹™ì„ ìˆ˜ì •í•©ë‹ˆë‹¤...
     
-    :: ±âÁ¸ ±ÔÄ¢ »èÁ¦
+    :: ê¸°ì¡´ ê·œì¹™ ì‚­ì œ
     netsh advfirewall firewall delete rule name="Allow recordWEB port"
-    echo ±âÁ¸ ±ÔÄ¢ÀÌ »èÁ¦µÇ¾ú½À´Ï´Ù.
+    echo ê¸°ì¡´ ê·œì¹™ì´ ì‚­ì œë˜ì—ˆìŠµë‹ˆë‹¤.
 )
 
-:: »õ·Î¿î ¹æÈ­º® ±ÔÄ¢ Ãß°¡
+:: ìƒˆë¡œìš´ ë°©í™”ë²½ ê·œì¹™ ì¶”ê°€
 netsh advfirewall firewall add rule name="Allow recordWEB port" dir=in action=allow protocol=TCP localport=%port%
 
 if %errorlevel% neq 0 (
-    echo Æ÷Æ® %port%¿¡ ´ëÇÑ ¹æÈ­º® ±ÔÄ¢ Ãß°¡¿¡ ½ÇÆÐÇß½À´Ï´Ù.
+    echo í¬íŠ¸ %port%ì— ëŒ€í•œ ë°©í™”ë²½ ê·œì¹™ ì¶”ê°€ì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.
     pause
     exit /b
 )
 
-echo Æ÷Æ® %port%¿¡ ´ëÇÑ ÀÎ¹Ù¿îµå ±ÔÄ¢ÀÌ ¼º°øÀûÀ¸·Î Ãß°¡µÇ¾ú½À´Ï´Ù.
+echo í¬íŠ¸ %port%ì— ëŒ€í•œ ì¸ë°”ìš´ë“œ ê·œì¹™ì´ ì„±ê³µì ìœ¼ë¡œ ì¶”ê°€ë˜ì—ˆìŠµë‹ˆë‹¤.
 pause
 ENDLOCAL

@@ -1,0 +1,39 @@
+name: Test Docker runtime support
+
+on:
+  push:
+    branches: ['codex/recordweb-runtime-*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - name: Build checked upstream execution copy and run regressions
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.runtime
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: recordweb-runtime:test
+          build-args: SOURCE_REVISION=${{ github.sha }}
+          provenance: false
+      - name: Verify CA policy and local-only feature exclusion
+        run: |
+          docker run --rm --network none --entrypoint python \
+            --mount "type=bind,src=$PWD/security/ca_policy.py,dst=/tmp/ca_policy.py,readonly" \
+            recordweb-runtime:test -I -B /tmp/ca_policy.py verify
+          docker run --rm --network none --entrypoint python recordweb-runtime:test \
+            -c "from pathlib import Path; assert not Path('/opt/recordweb-private').exists()"

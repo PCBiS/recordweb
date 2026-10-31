@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>계정생성</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+</head>
+<body class="page-register">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <h2>내맘대로 자동녹화 웹UI<span class="chip chip--ver">{{ program_version }}</span></h2>
+      </div>
+    </div>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+        
+        {% if loginMode %}
+            {% if request.session.get('logged_in') %}
+                <!-- 로그인된 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+
+                <!-- 로그인 정보와 로그아웃 링크 -->
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <!-- 로그인되지 않은 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <!-- 로그인 모드가 꺼져 있을 때 메뉴 표시 -->
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+
+            <!-- 로그인 정보와 로그아웃 링크 -->
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+
+
+    <div id="content" class="page-register">
+        <h2>계정 생성</h2>
+
+        {% if info_message %}
+        <p class="info-message">{{ info_message }}</p>
+        {% endif %}
+        
+        <!-- 오류 메시지 표시 -->
+        {% if error_message %}
+            <p class="error-message">{{ error_message }}</p>
+        {% endif %}
+
+        <form class="register-form" action="/register" method="post">
+          <label for="username">사용자명:</label>
+          <input type="text" id="username" name="username" required>
+
+          <label for="password">비밀번호:</label>
+          <input type="password" id="password" name="password" required>
+
+          <label for="password_confirm">비밀번호 확인:</label>
+          <input type="password" id="password_confirm" name="password_confirm" required>
+
+          <input type="submit" value="계정 생성">
+          
+          <a href="/login">로그인 페이지로 돌아가기</a>
+        </form>
+    </div>
+
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+</body>
+</html>

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ program_name }} {{ program_version }}</title>
+        <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+    </head>
+    <body data-login-mode="{{ loginMode | tojson }}">
+        <div class="navbar-container">
+            <div class="navbar">
+                <button class="menu-icon"
+                    type="button"
+                    aria-controls="mySidenav"
+                    aria-expanded="false"
+                    aria-label="메뉴 열기">&#9776;</button>
+                <h2>{{ web_ui_title }}<span class="chip chip--ver">{{ program_version }}</span></h2>
+            </div>
+        </div>
+
+        <!-- 슬라이드 메뉴 -->
+        <div id="mySidenav" class="sidenav">
+            <a href="javascript:void(0)" class="closebtn">&times;</a>
+
+            {% if loginMode %}
+                {% if request.session.get('logged_in') %}
+                    <!-- 로그인된 상태 -->
+                    <a href="/">메인화면</a>
+                    <a href="/recording" class="restricted-menu">녹화현황</a>
+                    <a href="/config" class="restricted-menu">설정관리</a>
+                    <a href="/channels" class="restricted-menu">채널관리</a>
+                    <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                    <a href="/files" class="restricted-menu">파일관리</a>
+
+                    <!-- 로그인 정보와 로그아웃 링크 -->
+                    <div id="user-info">
+                        <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                        <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                    </div>
+                {% else %}
+                    <!-- 로그인되지 않은 상태 -->
+                    <a href="/">메인화면</a>
+                    <a href="/register" class="restricted-menu">계정생성</a>
+                {% endif %}
+            {% else %}
+                <!-- 로그인 모드가 꺼져 있을 때 메뉴 표시 -->
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+
+                <!-- 로그인 정보와 로그아웃 링크 -->
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% endif %}
+        </div>
+
+        <div id="content" class="page-index">
+            {% if config.loginMode and not request.session.get('logged_in') %}
+                <!-- 로그인되지 않은 상태에서 로그인 모드가 활성화된 경우 -->
+                <div class="login-form">
+                    <h2>로그인</h2>
+
+                    {% if error_message %}
+                        <p class="error-message">{{ error_message }}</p>
+                    {% endif %}
+
+                    <form id="loginForm" action="/login" method="POST" class="login-form">
+                        <label for="username">사용자명:</label>
+                        <input type="text" id="username" name="username" required>
+
+                        <label for="password">비밀번호:</label>
+                        <input type="password" id="password" name="password" required>
+
+                        <input type="submit" value="로그인">
+
+                        <a href="/register" class="account-create-link">계정 생성</a>
+                    </form>
+                </div>
+            {% else %}
+                <!-- 로그인된 상태 또는 로그인 모드가 비활성화된 경우 -->
+                <section class="hero-index">
+                    <h2>WebUI DASHBOARD</h2>
+                </section>
+
+                <section class="card compat-card">
+                    <header class="card-head">
+                        <div class="eyebrow">사용된 프로그램 및 버전</div>
+                        <span class="chip chip--ok">테스트 완료</span>
+                    </header>
+
+                    <dl class="kv-grid">
+                        <div class="kv"><dt>Python</dt><dd>3.14.5</dd></div>
+                        <div class="kv"><dt>Streamlink</dt><dd>7.5.0</dd></div>
+                        <div class="kv"><dt>FFmpeg</dt><dd>8.0.1-full</dd></div>
+                        <div class="kv"><dt>yt-dlp</dt><dd>SABR 260306</dd></div>
+                        <div class="kv"><dt>aria2c</dt><dd>1.37.0</dd></div>
+                    </dl>
+
+                    <p class="compat-note">
+                        위 프로그램 및 버전으로 recordWEB {{ program_version }} 테스트 진행하였습니다
+                    </p>
+                </section>
+
+                <section class="card spec-card">
+                    <h3>recordWEB/GUI 권장사양</h3>
+
+                    <div class="spec-chips">
+                        <span class="chip">CPU ≥ 4스레드</span>
+                        <span class="chip">RAM ≥ 4GB</span>
+                        <span class="chip">SATA3 SSD</span>
+                        <span class="chip">Windows</span>
+                        <span class="chip">네트워크 ≥ 100Mbps</span>
+                        <span class="chip">절전모드 해제</span>
+                    </div>
+
+                    <ul class="spec-list">
+                        <li>⚡ <b>CPU</b> : 4스레드 이상</li>
+                        <li>💾 <b>RAM</b> : 4GB 이상</li>
+                        <li>📀 <b>저장장치</b> : SATA3 SSD 이상</li>
+                        <li>🖥️ <b>운영체제</b> : Windows</li>
+                        <li>🌐 <b>네트워크</b> : 유선 100Mbps 이상</li>
+                        <li>🔋 <b>전원관리</b> : 절전모드 해제</li>
+                    </ul>
+                    <p class="compat-note">
+                        권장사양 미만 PC에서는 recordLITE를 사용 권장합니다
+                    </p>
+                </section>
+            {% endif %}
+        </div>
+
+        <div id="version-history" class="page-version-history card">
+            <header class="card-head">
+                <div class="eyebrow">버전 업데이트 내역</div>
+                <span class="chip chip--ver">{{ program_version }}</span>
+            </header>
+
+            <ul class="patch-list">
+
+				<li class="patch-version">
+					<strong>recordWEB v1.2.9 — 일부 녹화 오류 수정 및 개선</strong>
+
+					<div class="patch-subtitle">주요 업데이트 내역</div>
+
+					<ul class="patch-sections">
+						<li class="patch-section">
+							<div class="patch-topic">녹화 파일명 길이 제한을 조정하였습니다.</div>
+							<ul class="patch-details">
+								<li>치지직과 씨미 방송 제목은 최대 45글자까지만 파일명에 사용되도록 제한하였습니다.</li>
+								<li>긴 방송 제목으로 인해 후처리 또는 파일 생성이 실패할 수 있는 상황을 줄였습니다.</li>
+							</ul>
+						</li>
+
+						<li class="patch-section">
+							<div class="patch-topic">녹화 상태 확인과 로그 표시를 개선하였습니다.</div>
+							<ul class="patch-details">
+								<li>씨미 라이브 판정을 보강하여 실제 방송중이 아닌 채널이 방송중으로 표시될 수 있는 경우를 줄였습니다.</li>
+								<li>채널 정보 갱신 중 불필요하게 출력되던 씨미/치지직 로그를 정리하였습니다.</li>
+								<li>씨미 녹화 중 CLI에서 녹화 시간과 임시파일 크기를 확인할 수 있도록 진행 로그를 추가하였습니다.</li>
+								<li>녹화 파일 생성 전 저장 경로의 디스크 용량 확인을 보강하였습니다.</li>
+							</ul>
+						</li>
+					</ul>
+				</li>
+
+				<li class="patch-version">
+					<strong>recordWEB v1.2.8 — 알림 기능 확장 및 녹화 안정성 개선</strong>
+
+					<div class="patch-subtitle">주요 업데이트 내역</div>
+
+					<ul class="patch-sections">
+						<li class="patch-section">
+							<div class="patch-topic">알림 기능을 확장하였습니다.</div>
+							<ul class="patch-details">
+								<li>기존 텔레그램 봇 알림 설정에서 보다 세부적으로 알림 설정을 할 수 있도록 변경하였습니다.</li>
+								<li>텔레그램 뿐만 아니라 디스코드 웹훅 알림 전송 기능을 추가하였습니다.</li>
+								<li>녹화 시작 실패, 비정상 종료, 후처리 성공/실패, 쿠키/권한 문제, 디스크 용량 부족 등 주요 상황별 알림을 설정관리에서 선택할 수 있습니다.</li>
+								<li>telgrem.json 파일을 notification.json 파일로 변경하였습니다. 기존 텔레그램 입력값은 다시 저장하셔야 합니다.</li>
+							</ul>
+						</li>
+
+						<li class="patch-section">
+							<div class="patch-topic">치지직 녹화 파일명 안정성을 추가로 개선하였습니다.</div>
+							<ul class="patch-details">
+								<li>파일명에 이전 방송의 날짜, 제목, 잘못된 품질 정보가 들어갈 수 있는 문제를 추가로 보완하였습니다.</li>
+								<li>라이브 메타데이터가 불안정하거나 늦게 갱신되는 경우에도 현재 방송 기준으로 파일명이 생성되도록 개선하였습니다.</li>
+								<li>품질 정보가 아직 확정되지 않은 상태에서 파일명이 부정확하게 생성되는 경우를 줄였습니다.</li>
+							</ul>
+						</li>
+
+						<li class="patch-section">
+							<div class="patch-topic">분할 녹화 오버랩 처리를 개선하였습니다.</div>
+							<ul class="patch-details">
+								<li>분할 녹화 사용 시 설정한 오버랩 시간이 실제 분할 파일에 반영되지 않던 문제를 수정하였습니다.</li>
+								<li>분할 파일 후처리 과정에서 앞 분할 파일의 마지막 구간을 다음 파일 앞부분에 포함하도록 개선하였습니다.</li>
+							</ul>
+						</li>
+
+						<li class="patch-section">
+							<div class="patch-topic">녹화 실패 및 후처리 실패 감지를 보강하였습니다.</div>
+							<ul class="patch-details">
+								<li>녹화 명령 생성 실패, 프로세스 시작 실패, 후처리 실패 등 기존에 사용자가 확인하기 어려웠던 오류 상황을 알림 대상으로 추가하였습니다.</li>
+								<li>치지직과 씨미 녹화 모두 공통 알림 이벤트를 사용하도록 정리하였습니다.</li>
+							</ul>
+						</li>
+					</ul>
+				</li>
+
+				<li class="patch-version">
+					<strong>recordWEB v1.2.7 — 치지직 녹화 파일명 안정성 개선</strong>
+
+					<div class="patch-subtitle">주요 업데이트 내역</div>
+
+					<ul class="patch-sections">
+						<li class="patch-section">
+							<div class="patch-topic">치지직 녹화 파일명 관련 문제를 수정하였습니다.</div>
+							<ul class="patch-details">
+								<li>방송 시작 직후 이전 방송의 제목이나 날짜가 녹화 파일명에 들어갈 수 있는 문제를 수정하였습니다.</li>
+								<li>방송 제목이나 채널명에 특수문자가 포함되어도 파일명이 안전하게 생성되도록 개선하였습니다.</li>
+								<li>VOD 다운로더에서도 동일한 파일명 생성 문제를 개선하였습니다.</li>
+							</ul>
+						</li>
+					</ul>
+				</li>
+
+				<li class="patch-version">
+					<strong>recordWEB v1.2.5 — 오류 수정 업데이트</strong>
+
+					<div class="patch-subtitle">주요 업데이트 내역</div>
+
+					<ul class="patch-sections">
+						<li class="patch-section">
+							<div class="patch-topic">일부 오류를 수정하였습니다.</div>
+							<ul class="patch-details">
+								<li>GUI 표시파일 누락으로 실행이 중단될 수 있는 문제를 수정하였습니다.</li>
+								<li>VOD 다운로드 파일명에 특수문자가 포함된 경우 mp4 확장자가 올바르게 처리되지 않을 수 있는 문제를 수정하였습니다.</li>
+							</ul>
+						</li>
+					</ul>
+				</li>
+
+                <li class="patch-version">
+                    <strong>recordWEB v1.2.4 — 파일명 설정 및 시스템 모니터 개선</strong>
+
+                    <div class="patch-subtitle">주요 업데이트 내역</div>
+
+                    <ul class="patch-sections">
+                        <li class="patch-section">
+                            <div class="patch-topic">방송 시작시간 파일명 옵션을 추가하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직과 씨미에서 방송 시작 날짜와 시간을 함께 표시하는 {broadcast_time} 옵션을 추가하였습니다.</li>
+                                <li>기존 녹화 시작시간과 방송 시작 날짜 옵션은 그대로 사용할 수 있습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">시스템 모니터 화면을 개선하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>CPU, 메모리, 네트워크, 저장공간을 더 간단하게 확인할 수 있도록 화면을 정리하였습니다.</li>
+                                <li>WEB과 GUI에서 시스템 모니터를 접거나 펼칠 수 있으며, 접은 상태에서는 측정을 중단합니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">GUI 버전 정보와 패치노트 기능을 추가하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>recordGUI의 버전 버튼을 누르면 업데이트 내역을 확인할 수 있습니다.</li>
+                                <li>WEB과 GUI가 같은 패치노트를 사용하도록 개선하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">일부 코드 정리 및 버그를 개선하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직 쿠키 확인 오류와 같이보기 녹화 조건을 수정하였습니다.</li>
+                                <li>씨미 방송 시작시간 처리와 일부 화면 표시 문제를 수정하였습니다.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="patch-version">
+                    <strong>recordWEB v1.2.3 — VOD 다운로더 기능 개선</strong>
+
+                    <div class="patch-subtitle">주요 업데이트 내역</div>
+
+                    <ul class="patch-sections">
+                        <li class="patch-section">
+                            <div class="patch-topic">씨미 VOD 다운로드 기능을 추가하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>씨미 VOD 주소를 입력하여 다시보기 영상을 다운로드할 수 있도록 추가하였습니다.</li>
+                                <li>씨미 VOD의 품질 목록을 불러오고, best, worst 및 제공되는 해상도 품질을 선택할 수 있도록 개선하였습니다.</li>
+                                <li>씨미 VOD 다운로드 파일명 뒤에 1080p60, 720p60, 480p30 같은 실제 다운로드 품질이 표시되도록 수정하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">치지직 월드컵 같이보기 VOD 다운로드 문제를 수정하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직 월드컵 같이보기 VOD에서 품질 목록을 가져오지 못할 수 있는 문제를 수정하였습니다.</li>
+                                <li>일부 VOD가 기존과 다른 방식으로 제공되어도 다운로드할 수 있도록 VOD 처리 방식을 보강하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">VOD 다운로더 쿠키 안내를 개선하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직 연령제한, 프라임, 네이버 멤버십 VOD는 로그인 쿠키가 필요할 수 있도록 안내를 추가하였습니다.</li>
+                                <li>씨미 720p60 이상 VOD는 로그인 쿠키가 필요할 수 있도록 안내를 추가하였습니다.</li>
+                                <li>WEB/GUI 쿠키관리 또는 cookie.json 직접 수정 방식으로 쿠키를 입력/갱신할 수 있도록 안내합니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">VOD 다운로더 GUI 표시를 정리하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>씨미 VOD 구간 다운로드를 사용할 수 있도록 GUI 옵션을 수정하였습니다.</li>
+                                <li>플랫폼별로 사용할 수 없는 옵션은 비활성화되도록 정리하였습니다.</li>
+                                <li>품질 목록에서 프레임 정보가 중복 표시될 수 있는 문제를 수정하였습니다.</li>
+                                <li>기존 쿠키 안내 버튼명을 유튜브 쿠키 안내로 변경하였습니다.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="patch-version">
+                    <strong>recordWEB v1.2.2 — 치지직 월드컵 같이보기 녹화 안정성 개선</strong>
+
+                    <div class="patch-subtitle">주요 업데이트 내역</div>
+
+                    <ul class="patch-sections">
+                        <li class="patch-section">
+                            <div class="patch-topic">치지직 월드컵 같이보기 방송 녹화 문제를 수정하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>월드컵 같이보기 방송에서 일부 품질값이 정상적으로 인식되지 않아 녹화가 시작되지 않을 수 있는 문제를 수정하였습니다.</li>
+                                <li>치지직에서 내려주는 내부 트랙 ID가 품질명으로 잘못 사용되던 문제를 수정하였습니다.</li>
+                                <li>월드컵 같이보기 방송에서도 best, 1080p, 720p, 480p, 360p, worst 품질 선택이 정상적으로 동작하도록 개선하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">치지직 녹화 파일명 품질 표시를 개선하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>녹화파일명에 알 수 없는 내부 트랙 ID가 들어갈 수 있는 문제를 수정하였습니다.</li>
+                                <li>품질 정보는 videoHeight 기준으로 1080p, 720p, 480p, 360p 형식으로 표시되도록 개선하였습니다.</li>
+                                <li>프레임 정보도 함께 확인하여 1080p60, 720p30 같은 파일명이 자연스럽게 생성되도록 정리하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">치지직 품질값 보정 처리를 추가하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>channels.json에 잘못된 품질값이 저장되어 있어도 가능한 경우 정상 품질명으로 자동 보정하도록 개선하였습니다.</li>
+                                <li>Streamlink에 넘길 수 없는 품질값이 감지되면 best로 안전하게 보정되도록 방어 처리를 추가하였습니다.</li>
+                                <li>일반 치지직 방송과 월드컵 같이보기 방송 모두 같은 방식으로 품질을 처리하도록 정리하였습니다.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="patch-version">
+                    <strong>recordWEB v1.2.1 — 후처리 및 쿠키 확인 안정성 개선</strong>
+
+                    <div class="patch-subtitle">주요 업데이트 내역</div>
+
+                    <ul class="patch-sections">
+                        <li class="patch-section">
+                            <div class="patch-topic">치지직 후처리 파일명 충돌 문제를 수정하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>원본 파일 보존과 fixed_ 접두사 제거를 함께 사용할 때 후처리가 실패할 수 있는 문제를 수정하였습니다.</li>
+                                <li>후처리 결과 파일명이 원본과 충돌하는 경우, 자동으로 (1), (2) 형식의 고유 파일명으로 저장되도록 개선하였습니다.</li>
+                                <li>파일명 변경 실패로 인해 후처리 결과 파일 이동이 진행되지 않던 문제를 개선하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">치지직 쿠키 확인 기능을 수정하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직 쿠키 확인 시 HTTP 404가 발생할 수 있는 문제를 수정하였습니다.</li>
+                                <li>쿠키 확인 API 주소를 현재 동작 가능한 주소 기준으로 변경하였습니다.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="patch-version">
+                    <strong>recordWEB v1.2.0 — 프로그램 변경사항 및 안정성 보강</strong>
+
+                    <div class="patch-subtitle">주요 업데이트 내역</div>
+
+                    <ul class="patch-sections">
+                        <li class="patch-section">
+                            <div class="patch-topic">유튜브 녹화 제거 및 씨미 녹화 기능을 정식으로 추가하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>토큰 관련 이슈로 인해 유튜브 라이브 녹화 기능은 모두 제거되었습니다.</li>
+                                <li>씨미 채널의 방송 제목, 카테고리, 썸네일, 방송 시작시간을 불러오도록 개선하였습니다.</li>
+                                <li>씨미 전용 아이콘 및 방송중/방송종료 기본 썸네일을 적용하였습니다.</li>
+                                <li>씨미 채널은 best, 2160p, 1080p, 720p, 480p, 360p, worst 품질을 선택할 수 있습니다.</li>
+                                <li>씨미 확장자는 최종 mp4 기준으로 고정됩니다.</li>
+                                <li>씨미 쿠키를 WEB/GUI 쿠키관리에서 입력하고 저장할 수 있도록 개선하였습니다.</li>
+                                <li>씨미 쿠키는 치지직 쿠키와 함께 /json/cookie.json 파일에 저장됩니다.</li>
+                                <li>씨미 연령제한 방송은 로그인 쿠키가 있을 때 접근할 수 있습니다.</li>
+                                <li>씨미 4K 방송은 4K 시청 권한이 있는 계정 쿠키가 있을 때 4K URL을 우선 사용합니다.</li>
+                                <li>쿠키값이 콘솔 로그에 그대로 출력되지 않도록 일부 로그를 마스킹 처리하였습니다.</li>
+                                <li>씨미 방송은 임시 .part.ts 파일로 녹화한 뒤 자동으로 mp4 파일로 마무리됩니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">쿠키 저장 구조를 변경하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직 쿠키와 씨미 쿠키가 같은 cookie.json 안에서 플랫폼별로 분리 저장됩니다.</li>
+                                <li>치지직 쿠키 유효성 검사 기능을 WEB/GUI 쿠키관리에서 사용할 수 있도록 개선하였습니다.</li>
+                                <li>씨미 쿠키 확인 기능을 WEB/GUI 쿠키관리에서 사용할 수 있도록 추가하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">설정관리 화면의 플랫폼별 적용 범위를 정리하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직 전용 설정과 치지직/씨미 공용 설정을 구분하여 표시하였습니다.</li>
+                                <li>씨미에서 사용하지 않는 치지직 후처리, 분할녹화, 인코딩, GPU 관련 설정은 치지직 전용으로 표시하였습니다.</li>
+                                <li>씨미는 내부적으로 mp4 자동 remux를 수행하므로 치지직 후처리 옵션과 별도로 동작합니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">치지직 녹화 안정성을 보강하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>치지직 녹화파일명에 '알 수 없는 품질' 또는 '알 수 없는 프레임'이 들어갈 수 있는 문제를 개선하였습니다.</li>
+                                <li>방송 시작 직후 품질/프레임 정보가 늦게 들어오는 경우 잠시 재확인 후 파일명을 생성합니다.</li>
+                                <li>치지직 쿠키 구조 변경에 맞추어 녹화, 메타데이터, 쿠키 검사 로직을 수정하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">후처리 작업 상태 추적 기능을 보강하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>후처리 시작/완료/실패 상태를 내부적으로 기록합니다.</li>
+                                <li>실패 내역은 /json/postprocess_failed.json 파일에 저장됩니다.</li>
+                                <li>후처리시 사용 GPU, FFmpeg PID, 실행 명령 확인 로그를 보강하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">실행모드 중복 실행 방지 기능을 추가하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>recordWEB, recordGUI, recordLITE를 동시에 실행하여 녹화상태가 꼬일 수 있는 문제를 방지하였습니다.</li>
+                                <li>하나의 실행모드가 동작 중이면 다른 실행모드는 시작되지 않도록 안전장치를 추가하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">프로그램 시작 점검 기능을 개선하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>프로그램 시작시 config.json, channels.json 및 필수 프로그램 경로를 점검하도록 개선하였습니다.</li>
+                                <li>설정값이 이상하거나 필수 프로그램을 찾지 못하는 경우 확인하기 쉽도록 경고 로그를 표시합니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">오류 기록 및 실행 로그 저장 기능을 개선하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>최근 오류를 /json/recent_errors.json 파일에 저장하도록 개선하였습니다.</li>
+                                <li>오류가 발생했을 때 어떤 위치에서 문제가 생겼는지 추적하기 쉽도록 하였습니다.</li>
+                                <li>WEB/GUI/LITE 실행 로그를 /logs 폴더에 저장하도록 개선하였습니다.</li>
+                                <li>로그 파일이 너무 커지지 않도록 자동 회전 방식으로 저장됩니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">WEB/GUI 화면 응답 안정성을 개선하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>webUI 대시보드 페이지 요청에 중복실행 방지 처리를 추가하여 페이지 응답이 멈추는 문제를 줄였습니다.</li>
+                                <li>GUI 설정 저장, 쿠키 저장, 녹화 시작/중지 요청에 타임아웃을 추가하여 GUI가 오래 멈추는 문제를 줄였습니다.</li>
+                                <li>GUI 썸네일 불러오기에 제한시간을 추가하여 네트워크 지연시 화면 갱신이 멈추는 문제를 개선하였습니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">recordLITE를 현재 버전 기준으로 수정하였습니다.</div>
+                            <ul class="patch-details">
+                                <li>유튜브 녹화 제거, 씨미 녹화 등 최신 1.2.0 버전 녹화 코어기능은 동일합니다</li>
+                                <li>webUI/GUI 버전과 설정, 채널, 쿠키 파일을 공유하여 사용합니다.</li>
+                            </ul>
+                        </li>
+
+                        <li class="patch-section">
+                            <div class="patch-topic">replayDownloader_GUI에서 유튜브 다운로드는 일부 제한될 수 있습니다.</div>
+                            <ul class="patch-details">
+                                <li>PO토큰 관련사항을 제거하였기 때문에, 유튜브 일부 영상은 문제가 발생할 수 있습니다.</li>
+                                <li>유튜브 쿠키 관련 안내를 다시보기 다운로더 GUI에 추가하였습니다.</li>
+                                <li>씨미 VOD 다운로드는 아직 지원하지 않습니다.</li>
+                            </ul>
+                        </li>
+
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+    </body>
+</html>

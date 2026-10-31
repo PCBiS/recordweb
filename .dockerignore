@@ -9,3 +9,9 @@ dependent/ffmpeg/
 dependent/streamlink/
 dependent/yt-dlp/
 dependent/aria2c/
+
+logs/
+diagnostics/
+private/
+.local-extensions/
+*.oci.tar

@@ -9,6 +9,9 @@ COPY module/file_manager.py module/data_manager.py module/storage_metrics.py /ap
 COPY templates/config.html /app/templates/config.html
 COPY templates/static/js/script.js /app/templates/static/js/script.js
 COPY tests/ /app/tests/
+COPY docker_support/ /app/docker_support/
+COPY upstream/ /app/upstream/
+COPY patches/ /app/patches/
 
 RUN --network=none python3 -B -m unittest discover -s tests -p 'test_*.py' -v
 RUN --network=none \

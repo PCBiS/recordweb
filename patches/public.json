@@ -1,0 +1,701 @@
+{
+  "schema": 1,
+  "id": "docker-compat-20261031",
+  "files": [
+    {
+      "path": "recordWEB.py",
+      "before": "6ad648566c1ce2f799b568d99f34cfee40f45563ef7cbb18162372c9bb2e202c",
+      "after": "24f899ec5feb1c1710470598d0d3189f2be7cc03f7ce87f5ad5cc4c5963a040b",
+      "edits": [
+        [
+          12,
+          14,
+          []
+        ],
+        [
+          88,
+          88,
+          [
+            "from module.storage_metrics import normalizeMonitorPaths, resolveMonitorPaths, collectStorageMetrics\n"
+          ]
+        ],
+        [
+          211,
+          212,
+          [
+            "            with suppress(asyncio.CancelledError, Exception):\n"
+          ]
+        ],
+        [
+          219,
+          220,
+          [
+            "                with suppress(asyncio.CancelledError, Exception):\n"
+          ]
+        ],
+        [
+          231,
+          232,
+          [
+            "                with suppress(asyncio.CancelledError, Exception):\n"
+          ]
+        ],
+        [
+          368,
+          368,
+          [
+            "def _wantsJsonResponse(request: Request) -> bool:\n",
+            "    return (\n",
+            "        request.url.path.startswith('/api/')\n",
+            "        or request.url.path in {'/get_config', '/updateAccount'}\n",
+            "        or 'application/json' in request.headers.get('accept', '').lower()\n",
+            "        or request.headers.get('content-type', '').lower().startswith('application/json')\n",
+            "    )\n",
+            "\n",
+            "\n"
+          ]
+        ],
+        [
+          370,
+          377,
+          [
+            "    if exc.status_code == 401 and not _wantsJsonResponse(request):\n",
+            "        return RedirectResponse(url='/login', status_code=302)\n",
+            "    return JSONResponse(\n",
+            "        status_code=exc.status_code,\n",
+            "        content={\"detail\": exc.detail},\n",
+            "        headers=exc.headers,\n",
+            "    )\n"
+          ]
+        ],
+        [
+          405,
+          409,
+          [
+            "    # A dependency response value does not stop the route handler.\n",
+            "    raise HTTPException(status_code=401, detail=\"Login required\")\n",
+            "\n",
+            "\n",
+            "async def requireFileManager(request: Request, login: Any = Depends(requireLogin)):\n",
+            "    config = request.app.state.config\n",
+            "    if not config.get('loginMode', False) or not config.get('fileManagerEnabled', False):\n",
+            "        raise HTTPException(status_code=403, detail=\"File manager disabled\")\n",
+            "    return True\n",
+            "\n",
+            "\n",
+            "async def requireWritableFileManager(request: Request, access: Any = Depends(requireFileManager)):\n",
+            "    if request.app.state.config.get('fileManagerReadOnly', False):\n",
+            "        raise HTTPException(status_code=403, detail=\"Read-only mode\")\n",
+            "    return True\n"
+          ]
+        ],
+        [
+          647,
+          648,
+          [
+            "# 시스템 모니터링은 짧은 주기로 반복 호출되므로 측정 결과를 재사용합니다.\n"
+          ]
+        ],
+        [
+          651,
+          653,
+          []
+        ],
+        [
+          658,
+          681,
+          [
+            "def _collectSysMetrics(config: dict, channels: List[dict]) -> dict:\n"
+          ]
+        ],
+        [
+          683,
+          683,
+          [
+            "    paths = resolveMonitorPaths(config, channels)\n",
+            "    path_key = tuple(paths)\n"
+          ]
+        ],
+        [
+          686,
+          687,
+          [
+            "        if (cached is not None\n",
+            "                and _SYS_METRICS_CACHE.get(\"paths\") == path_key\n",
+            "                and now - float(_SYS_METRICS_CACHE.get(\"at\") or 0.0) < _SYS_METRICS_CACHE_TTL):\n"
+          ]
+        ],
+        [
+          699,
+          756,
+          [
+            "        disks = collectStorageMetrics(paths, BASE_DIR)\n"
+          ]
+        ],
+        [
+          775,
+          776,
+          [
+            "            \"disks\": disks,\n"
+          ]
+        ],
+        [
+          780,
+          780,
+          [
+            "        _SYS_METRICS_CACHE[\"paths\"] = path_key\n"
+          ]
+        ],
+        [
+          1290,
+          1291,
+          [
+            "async def api_sys_metrics(request: Request, login: Any = Depends(requireLogin)):\n"
+          ]
+        ],
+        [
+          1292,
+          1293,
+          [
+            "        config = {\"systemMonitorPaths\": normalizeMonitorPaths(request.app.state.config.get(\"systemMonitorPaths\", []))}\n",
+            "        async with request.app.state.channels_lock:\n",
+            "            channels = [{\"output_dir\": c.get(\"output_dir\")} for c in request.app.state.channels]\n",
+            "        return JSONResponse(content=await asyncio.to_thread(_collectSysMetrics, config, channels))\n"
+          ]
+        ],
+        [
+          1326,
+          1326,
+          [
+            "\n",
+            "\n",
+            "# 로그인 폼은 메인 페이지에서 렌더링한다.\n",
+            "@app.get(\"/login\")\n",
+            "async def loginPage():\n",
+            "    return RedirectResponse(url='/', status_code=302)\n"
+          ]
+        ],
+        [
+          1435,
+          1436,
+          [
+            "    action: str = Form(...),\n",
+            "    login: Any = Depends(requireLogin)\n"
+          ]
+        ],
+        [
+          1439,
+          1443,
+          []
+        ],
+        [
+          1452,
+          1453,
+          [
+            "                if not new_password or new_password != new_password_confirm:\n"
+          ]
+        ],
+        [
+          1472,
+          1474,
+          []
+        ],
+        [
+          1493,
+          1493,
+          [
+            "        return JSONResponse(\n",
+            "            content={\"status\": \"error\", \"message\": \"처리할 수 없는 계정 요청입니다.\"},\n",
+            "            status_code=400,\n",
+            "        )\n"
+          ]
+        ],
+        [
+          1494,
+          1495,
+          [
+            "        print(f\"[ACCOUNT][ERROR] Account operation failed ({type(e).__name__})\")\n"
+          ]
+        ],
+        [
+          1496,
+          1497,
+          [
+            "            content={\"status\": \"error\", \"message\": \"계정 처리 중 오류가 발생했습니다.\"},\n"
+          ]
+        ],
+        [
+          1841,
+          1842,
+          [
+            "async def api_files_usage(request: Request, login: Any = Depends(requireFileManager)):\n"
+          ]
+        ],
+        [
+          1854,
+          1855,
+          [
+            "    login: Any = Depends(requireFileManager)\n"
+          ]
+        ],
+        [
+          1870,
+          1871,
+          [
+            "async def api_files_roots(request: Request, login: Any = Depends(requireFileManager)):\n"
+          ]
+        ],
+        [
+          1895,
+          1896,
+          [
+            "    login: Any = Depends(requireFileManager)\n"
+          ]
+        ],
+        [
+          1935,
+          1936,
+          [
+            "async def api_files_disk_usage(request: Request, paths: List[str] = Query(default=None), login: Any = Depends(requireFileManager)):\n"
+          ]
+        ],
+        [
+          1959,
+          1960,
+          [
+            "async def api_files_download(request: Request, path: str, login: Any = Depends(requireFileManager)):\n"
+          ]
+        ],
+        [
+          1974,
+          1975,
+          [
+            "async def api_files_mkdir(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):\n"
+          ]
+        ],
+        [
+          1985,
+          1986,
+          [
+            "    try:\n",
+            "        created = mkdirPath(parent, newName, roots)\n",
+            "    except ValueError:\n",
+            "        raise HTTPException(status_code=400, detail=\"invalid new_name\")\n",
+            "    except PermissionError:\n",
+            "        raise HTTPException(status_code=403, detail=\"outside allowed roots\")\n"
+          ]
+        ],
+        [
+          1991,
+          1992,
+          [
+            "async def api_files_rename(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):\n"
+          ]
+        ],
+        [
+          2002,
+          2003,
+          [
+            "    try:\n",
+            "        dst = renamePath(src, newName, roots)\n",
+            "    except ValueError:\n",
+            "        raise HTTPException(status_code=400, detail=\"invalid new_name\")\n",
+            "    except PermissionError:\n",
+            "        raise HTTPException(status_code=403, detail=\"outside allowed roots\")\n"
+          ]
+        ],
+        [
+          2008,
+          2009,
+          [
+            "async def api_files_move(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):\n"
+          ]
+        ],
+        [
+          2033,
+          2034,
+          [
+            "async def api_files_delete(request: Request, body: dict = Body(...), login: Any = Depends(requireWritableFileManager)):\n"
+          ]
+        ],
+        [
+          2075,
+          2076,
+          [
+            "    login: Any = Depends(requireWritableFileManager),\n"
+          ]
+        ],
+        [
+          2180,
+          2181,
+          [
+            "async def get_config_api(request: Request, login: Any = Depends(requireLogin)):\n"
+          ]
+        ],
+        [
+          2231,
+          2231,
+          [
+            "    systemMonitorPaths: Optional[str] = Form(None),\n"
+          ]
+        ],
+        [
+          2260,
+          2260,
+          [
+            "        posted_form = await request.form()\n",
+            "        monitor_paths = normalizeMonitorPaths(\n",
+            "            (systemMonitorPaths or \"\") if \"systemMonitorPaths\" in posted_form\n",
+            "            else current_config.get(\"systemMonitorPaths\", [])\n",
+            "        )\n"
+          ]
+        ],
+        [
+          2441,
+          2441,
+          [
+            "            \"systemMonitorPaths\":           monitor_paths,\n"
+          ]
+        ],
+        [
+          2582,
+          2583,
+          [
+            "async def get_config(request: Request, login: Any = Depends(requireLogin)):\n"
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "module/data_manager.py",
+      "before": "ff9a21f9df0dd49c78419bee984f6a5c06d129420c0b84088ad9e426806f7626",
+      "after": "131b338aa720e2363b168f2326f2550523d50884ca269cc4a5db283b7955326c",
+      "edits": [
+        [
+          22,
+          22,
+          [
+            "from module.storage_metrics import normalizeMonitorPaths\n"
+          ]
+        ],
+        [
+          945,
+          945,
+          [
+            "        \"systemMonitorPaths\": [],\n"
+          ]
+        ],
+        [
+          1035,
+          1035,
+          [
+            "    # 대시보드 저장소 경로: 비어 있으면 채널의 녹화 경로를 사용한다.\n",
+            "    merged[\"systemMonitorPaths\"] = normalizeMonitorPaths(merged.get(\"systemMonitorPaths\", []))\n",
+            "\n"
+          ]
+        ],
+        [
+          1074,
+          1074,
+          [
+            "    if isinstance(data, dict) and \"systemMonitorPaths\" in data:\n",
+            "        data = {**data, \"systemMonitorPaths\": normalizeMonitorPaths(data[\"systemMonitorPaths\"])}\n"
+          ]
+        ],
+        [
+          1079,
+          1079,
+          [
+            "        if \"systemMonitorPaths\" in merged:\n",
+            "            merged[\"systemMonitorPaths\"] = normalizeMonitorPaths(merged[\"systemMonitorPaths\"])\n"
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "module/file_manager.py",
+      "before": "e2dee4192a71500ea49c17fba07934a7a9d165796f95f11a077dfb97b491bc75",
+      "after": "dc0dda09cd51dd95e42c1d77b87eaac860009e8bed2af11bf37d5bf4d2a96d29",
+      "edits": [
+        [
+          1,
+          1,
+          [
+            "import ntpath\n"
+          ]
+        ],
+        [
+          240,
+          242,
+          [
+            "def validateEntryName(name: str) -> str:\n",
+            "    \"\"\"Accept one filename component, never a path on either supported OS.\"\"\"\n",
+            "    if (\n",
+            "        not isinstance(name, str)\n",
+            "        or not name\n",
+            "        or name in {'.', '..'}\n",
+            "        or '/' in name\n",
+            "        or '\\\\' in name\n",
+            "        or ntpath.splitdrive(name)[0]\n",
+            "        or any(ord(ch) < 32 or ord(ch) == 127 for ch in name)\n",
+            "    ):\n",
+            "        raise ValueError('new_name must be a single filename')\n",
+            "    if os.name == 'nt':\n",
+            "        stem = name.split('.', 1)[0].rstrip(' ').upper()\n",
+            "        reserved = {'CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$'}\n",
+            "        reserved.update(f'{prefix}{i}' for prefix in ('COM', 'LPT') for i in range(1, 10))\n",
+            "        if ':' in name or name.endswith((' ', '.')) or stem in reserved:\n",
+            "            raise ValueError('new_name is not a regular Windows filename')\n",
+            "    return name\n",
+            "\n",
+            "\n",
+            "def childDestination(parent: str, name: str, allowedRoots: List[str] = None) -> str:\n",
+            "    dst = os.path.join(normPath(parent), validateEntryName(name))\n",
+            "    if allowedRoots is not None:\n",
+            "        # Includes existing symlinks at the destination, not just the parent.\n",
+            "        ensureInRoots(dst, allowedRoots)\n",
+            "    return dst\n",
+            "\n",
+            "\n",
+            "def renamePath(src: str, newName: str, allowedRoots: List[str] = None) -> str:\n",
+            "    dst = childDestination(os.path.dirname(src), newName, allowedRoots)\n"
+          ]
+        ],
+        [
+          246,
+          248,
+          [
+            "def mkdirPath(parent: str, name: str, allowedRoots: List[str] = None) -> str:\n",
+            "    p = childDestination(parent, name, allowedRoots)\n"
+          ]
+        ],
+        [
+          304,
+          305,
+          [
+            "    return mime or \"application/octet-stream\"\n"
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "module/storage_metrics.py",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "fb7a59190c0d01f906bd7a2aa1c9eb92d398f48bcaf592999f591d8892b1c82d",
+      "edits": [
+        [
+          0,
+          0,
+          [
+            "\"\"\"Filesystem capacity for selected recording directories, without recursive scans.\"\"\"\n",
+            "\n",
+            "from __future__ import annotations\n",
+            "\n",
+            "import os\n",
+            "import shutil\n",
+            "import stat\n",
+            "from typing import Any\n",
+            "\n",
+            "\n",
+            "def normalizeMonitorPaths(value: Any) -> list[str]:\n",
+            "    \"\"\"Accept a saved list or the settings form's newline-separated text.\"\"\"\n",
+            "    if isinstance(value, str):\n",
+            "        candidates = value.splitlines()\n",
+            "    elif isinstance(value, list):\n",
+            "        candidates = value\n",
+            "    else:\n",
+            "        candidates = []\n",
+            "\n",
+            "    paths = []\n",
+            "    seen = set()\n",
+            "    for candidate in candidates:\n",
+            "        if not isinstance(candidate, str):\n",
+            "            continue\n",
+            "        path = candidate.strip()\n",
+            "        if not path or \"\\x00\" in path or path in seen:\n",
+            "            continue\n",
+            "        seen.add(path)\n",
+            "        paths.append(path)\n",
+            "    return paths\n",
+            "\n",
+            "\n",
+            "def resolveMonitorPaths(config: dict, channels: list[dict]) -> list[str]:\n",
+            "    \"\"\"Use explicit paths, or the configured recording destinations by default.\"\"\"\n",
+            "    paths = normalizeMonitorPaths((config or {}).get(\"systemMonitorPaths\", []))\n",
+            "    if paths:\n",
+            "        return paths\n",
+            "    return normalizeMonitorPaths([\n",
+            "        channel.get(\"output_dir\")\n",
+            "        for channel in channels or []\n",
+            "        if isinstance(channel, dict)\n",
+            "    ])\n",
+            "\n",
+            "\n",
+            "def collectStorageMetrics(paths: list[str], base_directory: str) -> list[dict]:\n",
+            "    \"\"\"Return one capacity row per filesystem and retain unavailable directories.\n",
+            "\n",
+            "    Relative paths are resolved against the application directory, matching the\n",
+            "    recording configuration. A missing directory is never replaced by a parent.\n",
+            "    This measures the filesystem's capacity, not the sizes of files in a folder.\n",
+            "    \"\"\"\n",
+            "    rows = []\n",
+            "    by_filesystem = {}\n",
+            "    seen_paths = set()\n",
+            "    for configured_path in normalizeMonitorPaths(paths):\n",
+            "        expanded = os.path.expanduser(configured_path)\n",
+            "        if not os.path.isabs(expanded):\n",
+            "            expanded = os.path.join(base_directory, expanded)\n",
+            "        path = os.path.normcase(os.path.realpath(expanded))\n",
+            "        if path in seen_paths:\n",
+            "            continue\n",
+            "        seen_paths.add(path)\n",
+            "\n",
+            "        row = {\n",
+            "            \"device\": \"\",\n",
+            "            \"mountpoint\": path,\n",
+            "            \"label\": path,\n",
+            "            \"fstype\": \"\",\n",
+            "            \"paths\": [path],\n",
+            "            \"available\": False,\n",
+            "            \"total\": None,\n",
+            "            \"used\": None,\n",
+            "            \"free\": None,\n",
+            "            \"percent\": None,\n",
+            "        }\n",
+            "        try:\n",
+            "            info = os.stat(path)\n",
+            "            if not stat.S_ISDIR(info.st_mode):\n",
+            "                raise NotADirectoryError(path)\n",
+            "            usage = shutil.disk_usage(path)\n",
+            "            if info.st_dev in by_filesystem:\n",
+            "                by_filesystem[info.st_dev][\"paths\"].append(path)\n",
+            "                continue\n",
+            "        except (OSError, ValueError):\n",
+            "            row[\"error\"] = \"unavailable\"\n",
+            "            rows.append(row)\n",
+            "            continue\n",
+            "\n",
+            "        accessible = int(usage.used) + int(usage.free)\n",
+            "        row.update({\n",
+            "            \"available\": True,\n",
+            "            \"total\": int(usage.total),\n",
+            "            \"used\": int(usage.used),\n",
+            "            \"free\": int(usage.free),\n",
+            "            \"percent\": round(100.0 * usage.used / accessible, 1) if accessible else 0.0,\n",
+            "        })\n",
+            "        by_filesystem[info.st_dev] = row\n",
+            "        rows.append(row)\n",
+            "    return rows\n"
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "templates/config.html",
+      "before": "25a76e610348a2cba721c74a8f1d44c95118a4a9ce7f5b865b36b1d0eecc8ed7",
+      "after": "83ceff80b29638ff26b42465e7594589d41cf2c6d9bc56c5d3b03f683f6aa5cb",
+      "edits": [
+        [
+          745,
+          745,
+          [
+            "            <h3>대시보드 저장 공간</h3>\n",
+            "            <label for=\"systemMonitorPaths\">표시할 저장 경로</label>\n",
+            "            <textarea id=\"systemMonitorPaths\" name=\"systemMonitorPaths\" rows=\"3\"\n",
+            "                      placeholder=\"예: /recordings\">{{ (config.systemMonitorPaths or [])|join('\\n') }}</textarea>\n",
+            "            <p class=\"description\">\n",
+            "              한 줄에 하나씩 입력합니다. 비워 두면 채널의 녹화 경로를 사용합니다.\n",
+            "              각 경로가 속한 저장소의 전체·사용·가용 공간을 표시하며, 같은 저장소는 한 번만 표시합니다.\n",
+            "              폴더 안 파일 크기의 합계나 파일매니저 접근 권한은 변경하지 않습니다.\n",
+            "            </p>\n",
+            "\n",
+            "            <hr style=\"border: none; border-top: 2px dashed #000; margin: 20px 0;\">\n",
+            "\n"
+          ]
+        ]
+      ]
+    },
+    {
+      "path": "templates/static/js/script.js",
+      "before": "25c723ded206a85fa233162fb929f7c9d06e17145839127e166d045e3634fc46",
+      "after": "1f8435cf2141f5e58002f079d55a00328476ea95a1469ce51214c0de674284f2",
+      "edits": [
+        [
+          1049,
+          1049,
+          [
+            "  t.title = (d?.paths || [d?.mountpoint]).filter(Boolean).join('\\n');\n"
+          ]
+        ],
+        [
+          1057,
+          1059,
+          [
+            "  const available = d?.available !== false;\n",
+            "  const pct = available ? +(d?.percent || 0) : 0;\n",
+            "  val.textContent = available ? `${pct.toFixed(0)}%` : '확인 불가';\n"
+          ]
+        ],
+        [
+          1071,
+          1072,
+          [
+            "  brief.textContent = available\n",
+            "    ? `${_fmtBytes(d?.used||0)} / ${_fmtBytes(d?.total||0)}`\n",
+            "    : '경로 또는 저장소에 접근할 수 없습니다.';\n"
+          ]
+        ],
+        [
+          1084,
+          1086,
+          [
+            "  const displayed = Array.isArray(arr) ? arr : [];\n",
+            "  const signature = JSON.stringify(displayed.map((d) => [d?.mountpoint, d?.label, d?.fstype, d?.paths, d?.available]));\n"
+          ]
+        ],
+        [
+          1091,
+          1092,
+          [
+            "    displayed.forEach((d, i) => {\n"
+          ]
+        ],
+        [
+          1099,
+          1102,
+          [
+            "  displayed.forEach((d, i) => {\n",
+            "    const available = d?.available !== false;\n",
+            "    const pct = available ? +(d?.percent || 0) : 0;\n",
+            "    document.getElementById(`disk-value-${i}`)?.replaceChildren(\n",
+            "      document.createTextNode(available ? `${pct.toFixed(0)}%` : '확인 불가')\n",
+            "    );\n"
+          ]
+        ],
+        [
+          1105,
+          1106,
+          [
+            "      document.createTextNode(available\n",
+            "        ? `${_fmtBytes(d?.used || 0)} / ${_fmtBytes(d?.total || 0)}`\n",
+            "        : '경로 또는 저장소에 접근할 수 없습니다.')\n"
+          ]
+        ],
+        [
+          1107,
+          1108,
+          [
+            "    _setMetricLevel(`disk-tile-${i}`, available ? pct : 100, 75, 90);\n"
+          ]
+        ],
+        [
+          1111,
+          1112,
+          [
+            "    document.createTextNode(displayed.length ? `${displayed.length}개 저장소` : '녹화 저장 경로 없음')\n"
+          ]
+        ]
+      ]
+    }
+  ]
+}
