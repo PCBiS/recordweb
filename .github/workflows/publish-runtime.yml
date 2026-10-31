@@ -1,0 +1,79 @@
+name: Publish checked Docker runtime
+
+on:
+  push:
+    branches: [codex/recordweb-runtime-20261031]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: recordweb-runtime-20261031
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/pcbis/recordweb
+  VERSION: v1.2.9-runtime-20261031
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Require an unused immutable release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "$IMAGE:$VERSION" > /tmp/tag.out 2> /tmp/tag.err; then
+            echo 'Immutable release already exists'; exit 1
+          fi
+          grep -Eq 'not found|MANIFEST_UNKNOWN|manifest unknown' /tmp/tag.err
+          echo "CANDIDATE=candidate-runtime-${GITHUB_SHA}-${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+      - name: Build checked source and run all regressions
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.runtime
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.CANDIDATE }}
+          outputs: type=image,oci-mediatypes=true
+          build-args: SOURCE_REVISION=${{ github.sha }}
+          provenance: false
+          sbom: false
+      - name: Verify exact candidate, CA policy and source fingerprints
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE@$DIGEST"
+          docker run --rm --network none --entrypoint python \
+            --mount "type=bind,src=$PWD/security/ca_policy.py,dst=/tmp/ca_policy.py,readonly" \
+            "$IMAGE@$DIGEST" -I -B /tmp/ca_policy.py verify
+          docker run --rm --network none --entrypoint python "$IMAGE@$DIGEST" -c \
+            "import hashlib,json,pathlib; r=pathlib.Path('/app'); m=json.loads((r/'docker-build-manifest.json').read_text()); assert all(hashlib.sha256((r/p).read_bytes()).hexdigest()==h for p,h in m['files'].items()); assert not pathlib.Path('/opt/recordweb-private').exists()"
+          docker buildx imagetools inspect --raw "$IMAGE@$DIGEST" > /tmp/runtime-manifest.json
+          python3 -c "import json; assert json.load(open('/tmp/runtime-manifest.json'))['mediaType']=='application/vnd.oci.image.manifest.v1+json'"
+      - name: Promote the verified immutable manifest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "$IMAGE:$VERSION" >/dev/null 2>&1; then exit 1; fi
+          docker buildx imagetools create --prefer-index=false --tag "$IMAGE:$VERSION" "$IMAGE@$DIGEST"
+          docker buildx imagetools inspect --raw "$IMAGE:$VERSION" > /tmp/runtime-release-manifest.json
+          cmp /tmp/runtime-manifest.json /tmp/runtime-release-manifest.json
+          echo "Published $IMAGE:$VERSION at $DIGEST" >> "$GITHUB_STEP_SUMMARY"
