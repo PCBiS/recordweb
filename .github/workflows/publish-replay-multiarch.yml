@@ -1,0 +1,112 @@
+name: Publish checked multiarch replay
+
+on:
+  push:
+    branches: [codex/recordweb-arm64-20261106]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: recordweb-replay-20261106-r2
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/pcbis/recordweb
+  VERSION: v1.2.9-replay-20261106-r2
+
+jobs:
+  platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build native checked candidate
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.runtime
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: ${{ env.IMAGE }}:candidate-replay-multi-${{ github.sha }}-${{ github.run_id }}-${{ matrix.arch }}
+          outputs: type=image,oci-mediatypes=true
+          build-args: SOURCE_REVISION=${{ github.sha }}
+          provenance: false
+          sbom: false
+      - name: Verify architecture, CA, source and native runtime
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE@$DIGEST"
+          test "$(docker image inspect --format '{{.Architecture}}' "$IMAGE@$DIGEST")" = "$ARCH"
+          docker run --rm --network none --entrypoint python \
+            --mount "type=bind,src=$PWD/security/ca_policy.py,dst=/tmp/ca_policy.py,readonly" \
+            "$IMAGE@$DIGEST" -I -B /tmp/ca_policy.py verify
+          docker run --rm --network none --entrypoint python "$IMAGE@$DIGEST" -c \
+            "import hashlib,json,pathlib; r=pathlib.Path('/app'); m=json.loads((r/'docker-build-manifest.json').read_text()); assert all(hashlib.sha256((r/p).read_bytes()).hexdigest()==h for p,h in m['files'].items()); assert not pathlib.Path('/opt/recordweb-private').exists()"
+          python3 security/runtime_smoke.py --image "$IMAGE@$DIGEST" --arch "$ARCH"
+          mkdir -p /tmp/receipts
+          python3 -c 'import json,os,pathlib; pathlib.Path("/tmp/receipts/"+os.environ["ARCH"]+".json").write_text(json.dumps({"arch":os.environ["ARCH"],"digest":os.environ["DIGEST"]}))'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: replay-digest-${{ matrix.arch }}
+          path: /tmp/receipts/*.json
+
+  publish:
+    needs: platform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: replay-digest-*
+          path: /tmp/receipts
+          merge-multiple: true
+      - name: Publish verified AMD64 and ARM64 index
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "$IMAGE:$VERSION" >/tmp/existing.out 2>/tmp/existing.err; then
+            echo 'Immutable release already exists'; exit 1
+          fi
+          grep -Eq 'not found|MANIFEST_UNKNOWN|manifest unknown' /tmp/existing.err
+          AMD64=$(python3 -c 'import json; print(json.load(open("/tmp/receipts/amd64.json"))["digest"])')
+          ARM64=$(python3 -c 'import json; print(json.load(open("/tmp/receipts/arm64.json"))["digest"])')
+          docker buildx imagetools create --tag "$IMAGE:$VERSION" "$IMAGE@$AMD64" "$IMAGE@$ARM64"
+          docker buildx imagetools inspect --raw "$IMAGE:$VERSION" >/tmp/index.json
+          python3 - <<'PY'
+          import json,pathlib
+          index=json.load(open('/tmp/index.json'))
+          assert index['mediaType']=='application/vnd.oci.image.index.v1+json'
+          expected={json.loads(p.read_text())['arch']:json.loads(p.read_text())['digest'] for p in pathlib.Path('/tmp/receipts').glob('*.json')}
+          actual={m['platform']['architecture']:m['digest'] for m in index['manifests'] if m['platform']['os']=='linux'}
+          assert len(index['manifests'])==2 and actual==expected and set(actual)=={'amd64','arm64'}
+          PY
+          docker buildx imagetools inspect "$IMAGE:$VERSION" >> "$GITHUB_STEP_SUMMARY"

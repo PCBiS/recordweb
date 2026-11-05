@@ -1,6 +1,6 @@
 # Docker 실행 지원·로그·진단
 
-이 버전은 개발자 원본을 `upstream/`에 그대로 보존하고 `patches/public.json`을 검증해 이미지 안의 `/app` 실행 사본을 만듭니다. 원본 파일 해시, 패치 입력/결과 해시가 맞지 않으면 빌드를 중단합니다. `Dockerfile.runtime`이 기존 의존성·CA 이미지 위에 Docker 지원 기능만 추가합니다. 기존 일반 빌드와 구분하며 Linux AMD64를 대상으로 합니다.
+이 버전은 개발자 원본을 `upstream/`에 그대로 보존하고 `patches/public.json`을 검증해 이미지 안의 `/app` 실행 사본을 만듭니다. 원본 파일 해시, 패치 입력/결과 해시가 맞지 않으면 빌드를 중단합니다. `Dockerfile.runtime`이 기존 의존성·CA 이미지 위에 Docker 지원 기능만 추가합니다. 기존 일반 빌드와 구분하며 Linux AMD64·ARM64를 대상으로 합니다.
 
 보안·파일관리·디스크 표시 수정은 공개 Docker판 기능입니다. 종료 시 취소된 metadata task가 나머지 정리를 중단시키지 않도록 취소 예외 처리도 포함합니다. 개인용 확장 코드·설정은 이 저장소와 공개 이미지에 포함하지 않습니다. 루트의 기존 앱 파일은 이전 패치의 비교·회귀 자료이며 새 이미지의 앱은 `upstream/`과 `patches/`로 생성됩니다.
 
@@ -11,7 +11,7 @@ Compose에서 새 버전 태그를 선택하고 기존 JSON·녹화 볼륨에 �
 ```yaml
 services:
   recordweb:
-    image: ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106
+    image: ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106-r2
     init: true
     restart: unless-stopped
     stop_grace_period: 60s

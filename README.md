@@ -1,6 +1,8 @@
 # recordWEB Docker
 
-recordWEB v1.2.9의 웹 녹화 기능과 다시보기 다운로드를 Linux AMD64 Docker 이미지로 제공합니다.
+recordWEB v1.2.9의 웹 녹화 기능과 다시보기 다운로드를 Linux AMD64·ARM64 Docker 이미지로 제공합니다.
+
+이미지 지원 플랫폼은 `linux/amd64`와 `linux/arm64`입니다. Docker가 호스트에 맞는 이미지를 선택합니다.
 
 ## 빠른 실행
 
@@ -23,7 +25,7 @@ docker compose -f compose.runtime.yaml pull
 docker compose -f compose.runtime.yaml up -d
 ```
 
-`compose.runtime.yaml`은 `ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106`을 사용합니다. JSON·영상·로그는 각각 `./data/json`, `./recordings`, `./logs`에 보존됩니다. 완료 작업 내역은 완료 후1시간 정리하며 영상은 파일관리에서 계속 확인할 수 있습니다.
+`compose.runtime.yaml`은 `ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106-r2`을 사용합니다. JSON·영상·로그는 각각 `./data/json`, `./recordings`, `./logs`에 보존됩니다. 완료 작업 내역은 완료 후1시간 정리하며 영상은 파일관리에서 계속 확인할 수 있습니다.
 
 ## 원본과 Docker 구성
 

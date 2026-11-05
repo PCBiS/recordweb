@@ -2,7 +2,7 @@ name: Test Docker runtime support
 
 on:
   push:
-    branches: ['codex/recordweb-replay-*']
+    branches: ['codex/recordweb-replay-*', 'codex/recordweb-arm64-*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -12,7 +12,15 @@ permissions:
 
 jobs:
   runtime:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -24,7 +32,7 @@ jobs:
         with:
           context: .
           file: Dockerfile.runtime
-          platforms: linux/amd64
+          platforms: linux/${{ matrix.arch }}
           push: false
           load: true
           tags: recordweb-runtime:test
@@ -37,3 +45,5 @@ jobs:
             recordweb-runtime:test -I -B /tmp/ca_policy.py verify
           docker run --rm --network none --entrypoint python recordweb-runtime:test \
             -c "from pathlib import Path; assert not Path('/opt/recordweb-private').exists()"
+      - name: Native startup, API and media smoke
+        run: python3 security/runtime_smoke.py --image recordweb-runtime:test --arch ${{ matrix.arch }}
