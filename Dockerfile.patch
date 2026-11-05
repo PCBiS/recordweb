@@ -10,7 +10,9 @@ COPY templates/config.html /app/templates/config.html
 COPY templates/static/js/script.js /app/templates/static/js/script.js
 COPY tests/ /app/tests/
 
-RUN --network=none python3 -B -m unittest discover -s tests -p 'test_*.py' -v
+RUN --network=none python3 -B -m unittest discover -s tests -p 'test_storage_metrics.py' -v && \
+    python3 -B -m unittest discover -s tests -p 'test_system_metrics_integration.py' -v && \
+    python3 -B -m unittest discover -s tests -p 'test_web_security.py' -v
 RUN --network=none \
     --mount=type=bind,source=security/ca_policy.py,target=/tmp/ca_policy.py,ro \
     python3 -I -B /tmp/ca_policy.py verify

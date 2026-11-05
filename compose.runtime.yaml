@@ -1,0 +1,15 @@
+services:
+  recordweb:
+    image: ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106
+    container_name: recordweb
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "${RECORDWEB_PORT:-5000}:5000"
+    volumes:
+      - ./data/json:/app/json
+      - ./recordings:/recordings
+      - ./logs:/var/log/recordweb
