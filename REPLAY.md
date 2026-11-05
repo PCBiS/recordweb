@@ -53,7 +53,7 @@ RecordWEB 웹 화면에서 영상 주소를 분석하고 화질과 옵션을 선
 ```yaml
 services:
   recordweb:
-    image: ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106
+    image: ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106-r2
     init: true
     restart: unless-stopped
     stop_grace_period: 60s

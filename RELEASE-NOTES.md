@@ -1,6 +1,10 @@
-# RecordWEB v1.2.9 다시보기 다운로드 통합
+# RecordWEB v1.2.9-replay-20261106-r2 · AMD64·ARM64 통합
 
-기존 RecordWEB Docker판에 다시보기 분석·다운로드 대기열과 설정관리 기능을 통합했습니다. 대상 플랫폼은 **Linux AMD64**입니다.
+기존 RecordWEB Docker판에 다시보기 분석·다운로드 대기열과 설정관리 기능을 통합했습니다. 대상 플랫폼은 **Linux AMD64·ARM64**입니다.
+
+## ARM64 통합
+
+동일 태그에서 `linux/amd64`와 `linux/arm64` 이미지를 제공합니다. ARM64는 기존 Docker ARM 이미지에 동일한 CA 정책과 검증된 원본/공개 패치 구성을 적용합니다. 두 아키텍처 모두 GitHub의 해당 아키텍처 러너에서 빌드·회귀 검사·기동/API·합성 미디어 검사를 수행합니다. 개별 ARM 장비에서의 실방송·장기 녹화 및 제공자 실수집은 별도 확인 범위입니다.
 
 ## 새 기능
 
@@ -26,10 +30,10 @@
 공개 이미지 태그:
 
 ```text
-ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106
+ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106-r2
 ```
 
-검증된 이미지 digest는 [GitHub 릴리스](https://github.com/PCBiS/recordweb/releases/tag/replay-20261106)에서 확인할 수 있습니다.
+검증된 이미지 digest는 [GitHub 릴리스](https://github.com/PCBiS/recordweb/releases/tag/replay-20261106-r2)에서 확인할 수 있습니다.
 
 Compose의 `image`를 위 태그 또는 게시된 digest로 지정합니다. 기존 JSON·녹화·로그 볼륨은 유지합니다.
 

@@ -1,5 +1,15 @@
-# Reuse the reviewed dependency/CA release; this change adds no packages.
-FROM ghcr.io/pcbis/recordweb@sha256:17d31a3fa2c0451ac95c4d84a07949153aab9be9874d397ed6c6f9d03a36b981 AS supported
+# syntax=docker/dockerfile:1
+ARG TARGETARCH
+# Keep the existing reviewed AMD64 dependency/CA image.
+FROM ghcr.io/pcbis/recordweb@sha256:17d31a3fa2c0451ac95c4d84a07949153aab9be9874d397ed6c6f9d03a36b981 AS dependency-amd64
+
+# Reuse the original ARM64 build and apply the same CA policy offline.
+FROM ghcr.io/pcbis/recordweb@sha256:bf809b256434aa8536d19b5092024b926ed3257b52783c6fcb310c2b323f750a AS dependency-arm64
+RUN --network=none \
+    --mount=type=bind,source=security/ca_policy.py,target=/tmp/ca_policy.py,ro \
+    python3 -I -B /tmp/ca_policy.py apply
+
+FROM dependency-${TARGETARCH} AS supported
 
 COPY upstream/ /opt/recordweb-upstream/
 COPY patches/ /opt/recordweb-patches/
@@ -26,7 +36,7 @@ ENV RECORDWEB_REPLAY_ENABLED=1 \
     RECORDWEB_REPLAY_DOWNLOAD_ROOT=/recordings/replay \
     RECORDWEB_LOG_DIR=/var/log/recordweb \
     PYTHONFAULTHANDLER=1
-LABEL org.opencontainers.image.version="1.2.9-replay-20261106" \
+LABEL org.opencontainers.image.version="1.2.9-replay-20261106-r2" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 VOLUME ["/var/log/recordweb"]
 ENTRYPOINT ["/opt/recordweb-docker/docker_support/entrypoint.sh"]
