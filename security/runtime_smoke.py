@@ -1,6 +1,7 @@
 """Run a disposable, network-isolated runtime smoke on the native CI host."""
 import argparse
 import json
+import os
 from pathlib import Path
 import secrets
 import subprocess
@@ -82,3 +83,19 @@ with tempfile.TemporaryDirectory(prefix='recordweb-runtime-smoke-') as temporary
                           'synthetic_h264_encode': True, 'exit_code': state['State']['ExitCode']}))
     finally:
         subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
+        # The default container user created private 0700 fixture directories.
+        # Restore ownership only inside this disposable bind before host cleanup.
+        cleanup = """
+import os
+root = '/fixture'
+uid = int(os.environ['FIXTURE_UID'])
+gid = int(os.environ['FIXTURE_GID'])
+for directory, dirs, files in os.walk(root, followlinks=False):
+    for name in dirs + files:
+        os.chown(os.path.join(directory, name), uid, gid, follow_symlinks=False)
+os.chown(root, uid, gid, follow_symlinks=False)
+"""
+        run(['docker', 'run', '--rm', '--network', 'none', '--entrypoint', 'python',
+             '--mount', f'type=bind,src={root},dst=/fixture',
+             '-e', f'FIXTURE_UID={os.getuid()}', '-e', f'FIXTURE_GID={os.getgid()}',
+             args.image, '-c', cleanup], timeout=30)
