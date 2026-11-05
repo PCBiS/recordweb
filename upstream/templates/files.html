@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>파일관리</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+</head>
+
+<body class="page-files" data-fm-enabled="{{ 1 if fm_enabled else 0 }}">
+  <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <h2>내맘대로 자동녹화 웹UI<span class="chip chip--ver">{{ program_version }}</span></h2>
+      </div>
+  </div>
+
+  <!-- 슬라이드 메뉴 -->
+  <div id="mySidenav" class="sidenav">
+    <a href="javascript:void(0)" class="closebtn">&times;</a>
+
+    {% if loginMode %}
+      {% if request.session.get('logged_in') %}
+        <a href="/">메인화면</a>
+        <a href="/recording" class="restricted-menu">녹화현황</a>
+        <a href="/config" class="restricted-menu">설정관리</a>
+        <a href="/channels" class="restricted-menu">채널관리</a>
+        <a href="/cookies" class="restricted-menu">쿠키관리</a>
+        <a href="/files" class="restricted-menu">파일관리</a>
+
+        <div id="user-info">
+          <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+          <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+        </div>
+      {% else %}
+        <a href="/">메인화면</a>
+        <a href="/register" class="restricted-menu">계정생성</a>
+      {% endif %}
+    {% else %}
+      <a href="/">메인화면</a>
+      <a href="/recording" class="restricted-menu">녹화현황</a>
+      <a href="/config" class="restricted-menu">설정관리</a>
+      <a href="/channels" class="restricted-menu">채널관리</a>
+      <a href="/cookies" class="restricted-menu">쿠키관리</a>
+      <a href="/files" class="restricted-menu">파일관리</a>
+
+      <div id="user-info">
+        <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+        <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div id="content">
+    <h1>파일 관리</h1>
+
+    <div id="files-app">
+      <!-- 1) 디스크 요약 (한 줄 칩 형태) -->
+      <div id="storage-summary" class="disk-chips" style="margin: 10px 0;"></div>
+
+      <!-- 2) 툴바 -->
+      <section class="file-toolbar">
+        <div class="toolbar-row">
+          <label for="rootSelect"><strong>루트</strong></label>
+          <select id="rootSelect"></select>
+
+          <label for="pathInput"><strong>경로</strong></label>
+          <input id="pathInput" type="text" style="width: 40ch;" placeholder="경로를 입력하거나 폴더를 클릭하세요" />
+          <button id="btnUp">상위로</button>
+          <button id="btnRefresh">새로고침</button>
+          <button id="btnMkdir">새 폴더</button>
+          <button id="btnStreamCopy" type="button">스트림복사</button>
+        </div>
+
+        <div class="toolbar-row">
+          <label for="fileSearch"><strong>검색</strong></label>
+          <input id="fileSearch" type="text" placeholder="이름으로 필터링" />
+        </div>
+      </section>
+
+      <!-- 3) 브레드크럼 + 리스트 -->
+      <section class="file-browser">
+        <div id="breadcrumbs" class="breadcrumbs"></div>
+        <!-- 데스크탑: 기존 테이블 뷰 -->
+        <div id="tableViewWrap" class="table-wrap">
+          <table class="common-table">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" id="chkAll" /></th>
+                <th class="col-type">유형</th>
+                <th class="col-name">이름</th>
+                <th class="col-size">크기</th>
+                <th class="col-mtime">수정일</th>
+                <th class="actions">작업</th>
+              </tr>
+            </thead>
+            <tbody id="fileTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- 모바일 -->
+        <div id="fileListMobile"></div>
+      </section>
+    </div>
+
+    <div id="mobileActionBar" class="mobile-actionbar">
+      <button id="mobMove"   disabled>이동</button>
+      <button id="mobDelete" disabled>삭제</button>
+      <button id="mobRename" disabled>수정</button>
+      <button id="mobDetail" disabled>상세</button>
+      <button id="mobSelect" class="secondary">선택</button>
+      <button id="mobCancel" class="cancel hidden">취소</button>
+    </div>
+
+    <!-- 파일매니저 비활성 안내 모달 -->
+    <div id="fm-disabled-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>파일 관리 기능이 꺼져 있어요</h3>
+        <p>파일관리를 사용하려면 다음을 설정해 주세요.</p>
+        <ol>
+          <li><b>설정관리</b>에서 <b>로그인 모드</b>를 <b>ON</b></li>
+          <li><b>계정생성</b> 이후 <b>관리자</b>로 로그인</li>
+          <li><b>파일매니저 사용</b>을 <b>ON</b></li>
+        </ol>
+        <p style="margin-top:8px;color:#666;">
+          ※ 파일관리자는 <b>시스템 주요 경로</b>를 제외한 일반 경로의 파일 작업이 가능합니다.
+        </p>
+        <div class="button-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button id="go-config">설정으로 이동</button>
+          <button id="close-fm-modal" class="secondary">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 폴더 선택(이동) 모달 -->
+  <div id="move-picker-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 640px;">
+      <h3 style="margin-bottom:8px;">폴더 선택</h3>
+
+      <div class="toolbar-row" style="gap:8px;align-items:center;margin-bottom:8px;">
+        <label><strong>루트</strong></label>
+        <select id="mp-rootSelect"></select>
+
+        <div id="mp-breadcrumbs" class="breadcrumbs" style="flex:1; overflow:auto;"></div>
+      </div>
+
+      <div id="mp-list" style="max-height:50vh;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;padding:4px 0;"></div>
+
+      <div class="button-row" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+        <button id="mp-cancel" class="secondary">취소</button>
+        <button id="mp-choose">여기로 이동</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 상세 모달 -->
+  <div id="file-detail-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>상세정보</h3>
+      <div id="detail-body" class="detail-body"></div>
+      <div class="button-row">
+        <button id="detail-close" class="secondary">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+</body>
+</html>

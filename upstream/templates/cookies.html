@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쿠키관리</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">  
+</head>
+<body class="page-cookies">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <h2>내맘대로 자동녹화 웹UI<span class="chip chip--ver">{{ program_version }}</span></h2>
+      </div>
+    </div>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+        
+        {% if loginMode %}
+            {% if request.session.get('logged_in') %}
+                <!-- 로그인된 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+
+                <!-- 로그인 정보와 로그아웃 링크 -->
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <!-- 로그인되지 않은 상태 -->
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <!-- 로그인 모드가 꺼져 있을 때 메뉴 표시 -->
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+
+            <!-- 로그인 정보와 로그아웃 링크 -->
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+
+    <div id="content">
+        <h1>[쿠키 관리]</h1>
+
+        <div class="notice">
+            <p><strong>치지직 쿠키 추출 방법:</strong></p>
+            1. 웹 브라우저에서 네이버 페이지를 열고 로그인합니다.<br>
+            2. F12 → Application 탭 → Cookies에서 <b>https://www.naver.com</b> 또는 <b>https://chzzk.naver.com</b>을 선택합니다.<br>
+            3. <b>NID_AUT, NID_SES</b> 값을 복사하여 입력합니다.<br>
+            4. 치지직 연령제한 방송은 해당 계정 쿠키가 있어야 합니다.<br>            
+            <br>
+            <p><strong>씨미 쿠키 추출 방법:</strong></p>
+            1. 웹 브라우저에서 씨미(<b>https://ci.me</b>)에 로그인합니다.<br>
+            2. F12 → Application 탭 → Cookies → <b>https://ci.me</b>를 선택합니다.<br>
+            3. <b>mauth-authorization-code, session-id</b> 값을 복사하여 입력합니다.<br>
+            4. 씨미 연령제한/4K 구독 방송은 해당 계정 쿠키가 있어야 합니다.<br>
+        </div>
+
+        <form id="updateCookiesForm" method="post">
+            <h3>[치지직 쿠키]</h3>
+
+            <label for="chzzk_NID_AUT">NID_AUT:</label>
+            <input
+                type="password"
+                id="chzzk_NID_AUT"
+                name="chzzk.NID_AUT"
+                value="{{ cookies.get('chzzk', {}).get('NID_AUT', '') }}"
+                autocomplete="off"
+            >
+
+            <label for="chzzk_NID_SES">NID_SES:</label>
+            <input
+                type="password"
+                id="chzzk_NID_SES"
+                name="chzzk.NID_SES"
+                value="{{ cookies.get('chzzk', {}).get('NID_SES', '') }}"
+                autocomplete="off"
+            >
+
+            <hr>
+
+            <h3>[씨미 쿠키]</h3>
+
+            <label for="cime_mauth">mauth-authorization-code:</label>
+            <input
+                type="password"
+                id="cime_mauth"
+                name="cime.mauth-authorization-code"
+                value="{{ cookies.get('cime', {}).get('mauth-authorization-code', '') }}"
+                autocomplete="off"
+            >
+
+            <label for="cime_session">session-id:</label>
+            <input
+                type="password"
+                id="cime_session"
+                name="cime.session-id"
+                value="{{ cookies.get('cime', {}).get('session-id', '') }}"
+                autocomplete="off"
+            >
+
+            <input type="submit" value="쿠키 업데이트">
+        </form>
+
+        <div class="last-modified">
+        </div><br>
+
+        <hr>
+        <h3>[쿠키 유효성 검사]</h3>
+
+        <p>현재 저장된 NID_AUT / NID_SES 쿠키가 아직 사용 가능한지 확인합니다.</p>
+        <button type="button" id="checkChzzkCookieBtn">치지직 쿠키 확인</button>
+        <p id="chzzkCookieCheckResult" class="compat-note"></p>
+
+        <p>현재 저장된 mauth-authorization-code / session-id 쿠키가 씨미 요청에 적용되는지 확인합니다.</p>
+        <button type="button" id="checkCimeCookieBtn">씨미 쿠키 확인</button>
+        <p id="cimeCookieCheckResult" class="compat-note"></p>
+
+    </div>
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+</body>
+</html>
