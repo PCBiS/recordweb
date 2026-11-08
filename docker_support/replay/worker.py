@@ -1,6 +1,17 @@
 """Private one-operation subprocess. Its only public output is safe JSON events."""
 import os
+import stat
 import sys
+
+
+def readonly_cookie_path(path):
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return None
+    if stat.S_ISREG(info.st_mode) and info.st_size > 0:
+        return path
+    return None
 
 
 def main():
@@ -69,7 +80,7 @@ def main():
             return default
 
         dm.readJsonSafe = readonly_json
-        dm.yloadCookies = lambda: dm.yCOOKIE_PATH if Path(dm.yCOOKIE_PATH).is_file() and not Path(dm.yCOOKIE_PATH).is_symlink() else None
+        dm.yloadCookies = lambda: readonly_cookie_path(dm.yCOOKIE_PATH)
         emit({'event': 'stage', 'stage': 'analyzing'})
         platform = parsed[0]['platform'] if args.operation == 'download' else None
         with guarded_core(core, platform, emit, diagnostics=diagnostics):
