@@ -1,6 +1,6 @@
 services:
   recordweb:
-    image: ghcr.io/pcbis/recordweb:v1.2.9-deps-20261108
+    image: ghcr.io/pcbis/recordweb:v1.2.9-cime-tls-20261109
     container_name: recordweb
     init: true
     restart: unless-stopped

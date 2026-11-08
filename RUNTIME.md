@@ -11,7 +11,7 @@ Compose에서 새 버전 태그를 선택하고 기존 JSON·녹화 볼륨에 �
 ```yaml
 services:
   recordweb:
-    image: ghcr.io/pcbis/recordweb:v1.2.9-deps-20261108
+    image: ghcr.io/pcbis/recordweb:v1.2.9-cime-tls-20261109
     init: true
     restart: unless-stopped
     stop_grace_period: 60s
