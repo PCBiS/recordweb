@@ -1,20 +1,20 @@
-name: Publish checked multiarch replay
+name: Publish checked dependency release
 
 on:
   push:
-    branches: [codex/recordweb-arm64-20261106]
+    branches: [codex/recordweb-deps-20261108]
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: recordweb-replay-20261106-r2
+  group: recordweb-deps-20261108
   cancel-in-progress: false
 
 env:
   IMAGE: ghcr.io/pcbis/recordweb
-  VERSION: v1.2.9-replay-20261106-r2
+  VERSION: v1.2.9-deps-20261108
 
 jobs:
   platform:
@@ -27,7 +27,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:

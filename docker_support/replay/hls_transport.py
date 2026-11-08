@@ -1,6 +1,9 @@
 """RAM-only transport for Naver HLS segment query authentication."""
+from functools import lru_cache
+from io import BytesIO
 from pathlib import Path
 import re
+import subprocess
 import threading
 from urllib.parse import unquote_plus, urljoin, urlsplit, urlunsplit
 
@@ -130,6 +133,31 @@ def _fetch_manifest(url, headers):
         return b''.join(pieces)
 
 
+def _has_extensionless_media(payload):
+    # Called only after every media/key/map URI has passed rewrite validation.
+    # Stream the bounded RAM payload; avoid another full manifest text/list.
+    for line in BytesIO(payload):
+        line = line.strip()
+        if line and not line.startswith(b'#'):
+            basename = urlsplit(line.decode('utf-8')).path.rsplit('/', 1)[-1]
+            if basename and '.' not in basename:
+                return True
+    return False
+
+
+@lru_cache(maxsize=16)
+def _supports_extension_picky(ffmpeg):
+    # Offline capability detection supports both old homelab FFmpeg 5 and the
+    # hardened FFmpeg 9 image without putting a signed URL in a subprocess argv.
+    try:
+        result = subprocess.run([str(ffmpeg), '-hide_banner', '-h', 'demuxer=hls'],
+                                capture_output=True, timeout=5, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0 and bool(
+        re.search(rb'^\s*-extension_picky\s', result.stdout, re.MULTILINE))
+
+
 def run_signed_hls(input_url, output_file, section, ffmpeg, headers, subprocess_module, set_processes, clear_processes):
     if not is_signed_naver_hls(input_url):
         raise ReplayFailure('protocol_denied')
@@ -140,10 +168,15 @@ def run_signed_hls(input_url, output_file, section, ffmpeg, headers, subprocess_
         raise
     except Exception as exc:
         raise ReplayFailure(classify_exception(exc)) from None
+    input_options = []
+    if _has_extensionless_media(payload):
+        input_options = ['-format_whitelist', 'hls,mpegts,mov,aac']
+        if _supports_extension_picky(str(ffmpeg)):
+            input_options += ['-extension_picky', '0']
     # Headers are deliberately absent: this input is a pipe, and each remote
     # segment authenticates with its own inherited signed query.
     command = [ffmpeg, '-hide_banner', '-loglevel', 'error', '-nostdin', *before,
-               '-protocol_whitelist', 'https,tls,tcp,crypto,pipe', '-f', 'hls', '-i', 'pipe:0',
+               '-protocol_whitelist', 'https,tls,tcp,crypto,pipe', *input_options, '-f', 'hls', '-i', 'pipe:0',
                *after, '-c', 'copy', '-y', str(output_file)]
     process = subprocess_module.Popen(command, stdin=subprocess_module.PIPE, stderr=subprocess_module.PIPE)
     diagnostics = {}

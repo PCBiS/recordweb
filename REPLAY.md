@@ -53,7 +53,7 @@ RecordWEB 웹 화면에서 영상 주소를 분석하고 화질과 옵션을 선
 ```yaml
 services:
   recordweb:
-    image: ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106-r2
+    image: ghcr.io/pcbis/recordweb:v1.2.9-deps-20261108
     init: true
     restart: unless-stopped
     stop_grace_period: 60s
@@ -73,4 +73,4 @@ services:
 
 다운로드 API는 기존 로그인 세션을 확인하고 변경 요청은 CSRF 토큰과 요청 출처를 검사합니다. 기존 쿠키는 서버에서 읽으며 브라우저·작업 DB·새 작업 로그에 쿠키 값을 복사하지 않습니다. 수신 중이거나 검증이 끝나지 않은 파일은 다운로드 링크로 제공하지 않습니다. 저장 공간 기준은 시작 전과 수신 중에 확인합니다.
 
-최종 기능 후보는 Docker 환경에서 136개 테스트를 통과했습니다. 별도 실제 제공자 시험에서는 치지직 DASH·HLS 다시보기의 각 60초 수집과 공개 클립 전체 다운로드를 확인했습니다. 씨미·YouTube의 실제 수집, 인증 필요 영상, 새 실방송 및 장기 녹화는 이 검증 범위에 포함하지 않습니다.
+2026년 11월 8일 의존성 후보는 AMD64에서 회귀 163개와 실제 CHZZK·CIME·YouTube 각 1분 녹화를 통과했습니다. 별도 실제 제공자 시험에서는 치지직 DASH·HLS 다시보기의 각 60초 수집과 공개 클립 전체 다운로드를 확인했습니다. 인증 필요 영상과 장기 녹화는 별도 검증 범위입니다.

@@ -5,7 +5,7 @@
     {
       "path": "module/data_manager.py",
       "before": "ff9a21f9df0dd49c78419bee984f6a5c06d129420c0b84088ad9e426806f7626",
-      "after": "1442d1b5b993d7fb21d2d9860b188fc1549800ec6507759b9dfd0bfccfd01720",
+      "after": "c3e7c0b75cc2f4b546e6f593913a27aa975f08301f599829f136604f23103ac6",
       "edits": [
         [
           0,
@@ -1139,7 +1139,11 @@
             "            f.write(\"# Netscape HTTP Cookie File\\n\")\n",
             "        return None  # 쿠키 파일을 막 생성했으니 내용은 아직 유효하지 않을 수 있음\n",
             "    \n",
-            "    # 파일이 존재하면, 경로만 반환\n",
+            "    # Empty existing jars mean anonymous access; leave their bytes intact.\n",
+            "    if os.path.getsize(yCOOKIE_PATH) == 0:\n",
+            "        return None\n",
+            "\n",
+            "    # Nonempty jars retain the existing yt-dlp validation/error behavior.\n",
             "    return yCOOKIE_PATH\n",
             "\n",
             "\n",
@@ -1938,7 +1942,7 @@
     {
       "path": "module/replay_download.py",
       "before": "6707f791a74b856303a3e6f5cbd0a5a2b6c11a9358e24d365de125d78f952ac9",
-      "after": "d6455e9c402a4b250a0b75c9182c31c882a6f590e33f885139c94ddaf4cea171",
+      "after": "f6a6470934cf6e0d18cf3fed71640037aa68237aab37828fbbcb7546b0d90af4",
       "edits": [
         [
           0,
@@ -3776,9 +3780,10 @@
             "\n",
             "    cmd += [\n",
             "        vod_url,\n",
-            "        '-f', f'{format_id}+bestaudio',\n",
+            "        '-f', f'{format_id}[acodec!=none]/{format_id}+bestaudio',\n",
             "        '-o', output_file,\n",
             "        '--merge-output-format', 'mkv',\n",
+            "        '--no-hls-use-mpegts',\n",
             "        '--ffmpeg-location', os.path.dirname(ffmpeg_path),\n",
             "        '--postprocessor-args', 'ffmpeg:-loglevel error'\n",
             "    ]\n",

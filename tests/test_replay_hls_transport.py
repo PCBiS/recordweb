@@ -12,6 +12,7 @@ import types
 import unittest
 from unittest.mock import patch
 
+from docker_support.replay import hls_transport
 from docker_support.replay.engine import guarded_core
 from docker_support.replay.errors import ReplayFailure
 from docker_support.replay.hls_transport import is_signed_naver_hls, rewrite_media_playlist, run_signed_hls
@@ -160,6 +161,90 @@ class HlsTransportTests(unittest.TestCase):
         self.assertEqual(error.exception.code, 'protocol_denied')
         with patch('docker_support.replay.hls_transport.requests.get', return_value=Response()), patch('docker_support.replay.hls_transport.MAX_MANIFEST_BYTES', 10), self.assertRaises(ReplayFailure):
             run_signed_hls(PARENT, 'unused.mp4', None, 'ffmpeg', {}, subprocess, lambda p: None, lambda: None)
+
+
+class OpaqueSegmentCompatibilityTests(unittest.TestCase):
+    def setUp(self):
+        hls_transport._supports_extension_picky.cache_clear()
+
+    def tearDown(self):
+        hls_transport._supports_extension_picky.cache_clear()
+
+    def run_fixture(self, playlist, *, opaque, supported=True, repeats=1):
+        with tempfile.TemporaryDirectory(dir=ROOT / 'tests') as temporary:
+            base=Path(temporary)
+            tool, marker = base/'ffmpeg', base/'capability-probes'
+            code = """
+import sys
+from pathlib import Path
+args=sys.argv[1:]
+marker=Path(MARKER)
+if args==['-hide_banner','-h','demuxer=hls']:
+    marker.write_text((marker.read_text() if marker.exists() else '')+'probe\\n')
+    print('  -extension_picky <boolean>' if SUPPORTED else 'HLS demuxer options:')
+    raise SystemExit(0)
+assert args[args.index('-protocol_whitelist')+1]=='https,tls,tcp,crypto,pipe'
+assert args[args.index('-i')+1]=='pipe:0'
+assert '-headers' not in args and '-cookies' not in args and '-tls_verify' not in args
+assert not any('SYNTHETIC' in argument for argument in args)
+assert ('-format_whitelist' in args)==OPAQUE
+assert ('-extension_picky' in args)==(OPAQUE and SUPPORTED)
+if OPAQUE:
+    assert args[args.index('-format_whitelist')+1]=='hls,mpegts,mov,aac'
+    assert args.index('-format_whitelist') < args.index('-i')
+if OPAQUE and SUPPORTED:
+    assert args[args.index('-extension_picky')+1]=='0'
+    assert args.index('-extension_picky') < args.index('-i')
+payload=sys.stdin.buffer.read()
+assert b'_lsu_sa_=SYNTHETIC%2BSECRET' in payload
+Path(args[-1]).write_bytes(b'FAKE-MEDIA'*200)
+"""
+            code=code.replace('MARKER',repr(str(marker))).replace('SUPPORTED',repr(supported)).replace('OPAQUE',repr(opaque))
+            tool.write_text('#!'+sys.executable+'\n'+code)
+            tool.chmod(0o700)
+            registered=[]
+            for index in range(repeats):
+                with patch.object(hls_transport,'_fetch_manifest',return_value=playlist):
+                    self.assertTrue(run_signed_hls(PARENT,base/('out-'+str(index)+'.mp4'),None,str(tool),
+                        {'Cookie':'SYNTHETIC_COOKIE'},subprocess,registered.extend,registered.clear))
+                self.assertFalse(registered)
+            self.assertEqual(marker.read_text().count('probe') if marker.exists() else 0, 1 if opaque else 0)
+
+    def test_normal_ts_and_m4s_do_not_change_command_or_probe_capability(self):
+        for name in (b'a.ts?filename=opaque',b'a.m4s'):
+            with self.subTest(name=name):self.run_fixture(PLAYLIST.replace(b'a.ts',name),opaque=False)
+
+    def test_extensionless_media_adds_bounded_format_and_supported_extension_options(self):
+        self.run_fixture(PLAYLIST.replace(b'a.ts',b'opaque/media?_lsu_sa_=SYNTHETIC%2BSECRET'),opaque=True,repeats=2)
+
+    def test_extensionless_media_remains_compatible_with_old_ffmpeg_without_option(self):
+        self.run_fixture(PLAYLIST.replace(b'a.ts',b'opaque/media'),opaque=True,supported=False)
+
+    def test_opaque_initialization_or_key_alone_does_not_expand_normal_media_gate(self):
+        playlist=PLAYLIST.replace(b'#EXTINF:5,',b'#EXT-X-MAP:URI="opaque/init"\n#EXT-X-KEY:METHOD=AES-128,URI="opaque/key"\n#EXTINF:5,')
+        self.run_fixture(playlist,opaque=False)
+
+    def test_all_uri_validation_precedes_opaque_capability_probe(self):
+        playlist=PLAYLIST.replace(b'a.ts',b'opaque/media').replace(b'#EXTINF:5,',b'#EXT-X-KEY:METHOD=AES-128,URI="file:///forbidden"\n#EXTINF:5,')
+        with patch.object(hls_transport,'_fetch_manifest',return_value=playlist), \
+             patch.object(hls_transport,'_supports_extension_picky') as capability, \
+             self.assertRaises(ReplayFailure) as error:
+            run_signed_hls(PARENT,'unused.mp4',None,'ffmpeg',{},subprocess,lambda p:None,lambda:None)
+        self.assertEqual(error.exception.code,'protocol_denied')
+        capability.assert_not_called()
+
+    def test_unicode_media_paths_classify_individually_without_ascii_assumption(self):
+        for name,opaque in [('미디어.ts',False),('café.m4s',False),('미디어',True),('café',True)]:
+            with self.subTest(name=name):
+                self.run_fixture(PLAYLIST.replace(b'a.ts',name.encode('utf-8')),opaque=opaque)
+
+    def test_empty_media_basename_does_not_expand_gate(self):
+        payload=rewrite_media_playlist(PLAYLIST.replace(b'a.ts',b'/'),PARENT)
+        self.assertFalse(hls_transport._has_extensionless_media(payload))
+
+    def test_offline_capability_probe_failure_omits_unsupported_option(self):
+        with patch.object(hls_transport.subprocess,'run',side_effect=subprocess.TimeoutExpired('ffmpeg',5)):
+            self.assertFalse(hls_transport._supports_extension_picky('synthetic-unavailable'))
 
 
 if __name__ == '__main__':

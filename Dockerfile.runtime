@@ -9,7 +9,40 @@ RUN --network=none \
     --mount=type=bind,source=security/ca_policy.py,target=/tmp/ca_policy.py,ro \
     python3 -I -B /tmp/ca_policy.py apply
 
-FROM dependency-${TARGETARCH} AS supported
+# Insert after dependency-amd64 / dependency-arm64 definitions and before supported.
+FROM dependency-${TARGETARCH} AS ffmpeg9-build
+ARG TARGETARCH
+ARG FFMPEG_BUILD_JOBS=2
+ENV DEBIAN_FRONTEND=noninteractive
+RUN sed -i -e 's|http://deb.debian.org|https://deb.debian.org|g' \
+           -e 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends build-essential dpkg-dev python3 ca-certificates libharfbuzz-dev \
+ && apt-get build-dep -y --no-install-recommends ffmpeg=7:5.1.9-0+deb12u1
+COPY ffmpeg9/build.py /opt/ffmpeg9-build/build.py
+RUN --mount=type=cache,id=recordweb-ffmpeg9-source-${TARGETARCH},target=/opt/ffmpeg9-build/work \
+    python3 /opt/ffmpeg9-build/build.py build
+
+FROM dependency-${TARGETARCH} AS ffmpeg9-runtime
+COPY --from=ffmpeg9-build /opt/recordweb/ffmpeg-9.0.2/ /opt/recordweb/ffmpeg-9.0.2/
+COPY --from=ffmpeg9-build /opt/ffmpeg9-build/runtime-packages.json /opt/recordweb/ffmpeg-9.0.2/runtime-packages.json
+COPY ffmpeg9/install-runtime.py /opt/recordweb/ffmpeg-9.0.2/install-runtime.py
+RUN python3 /opt/recordweb/ffmpeg-9.0.2/install-runtime.py
+
+FROM ffmpeg9-runtime AS ffmpeg9-verified
+COPY ffmpeg9/test-child-playlists.py /opt/recordweb/ffmpeg-9.0.2/test-child-playlists.py
+RUN --network=none python3 /opt/recordweb/ffmpeg-9.0.2/test-child-playlists.py --expect fixed
+
+FROM ffmpeg9-verified AS supported
+
+COPY security/requirements.runtime.txt /app/requirements.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade \
+       libbrotli1=1.0.9-2+deb12u1 libssl3=3.0.22-1~deb12u2 openssl=3.0.22-1~deb12u2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --only-binary=:all: pip==26.2 \
+    && python -m pip install --no-cache-dir --only-binary=:all: -r /app/requirements.txt \
+    && python -m pip check
 
 COPY upstream/ /opt/recordweb-upstream/
 COPY patches/ /opt/recordweb-patches/
@@ -28,6 +61,14 @@ COPY patches/ /app/patches/
 COPY docker_support/ /app/docker_support/
 RUN --network=none REPLAY_TEST_REAL_FFMPEG=/usr/bin/ffmpeg REPLAY_TEST_UPSTREAM=/app/upstream/module/replay_download.py python -B -m unittest discover -s tests -p 'test_*.py' -v
 
+
+RUN --network=none --mount=type=bind,source=security/verify_dependency_patch.py,target=/tmp/verify_deps.py,ro \
+    python -B /tmp/verify_deps.py
+RUN --network=none --mount=type=bind,source=security/verify_ffmpeg_application.py,target=/tmp/verify_media.py,ro \
+    RUNTIME_SOURCE=/app python -B /tmp/verify_media.py
+RUN --network=none --mount=type=bind,source=security/ca_policy.py,target=/tmp/ca_policy.py,ro \
+    python -I -B /tmp/ca_policy.py verify
+
 FROM supported AS runtime
 COPY --from=regression /app/docker-build-manifest.json /app/docker-build-manifest.json
 ARG SOURCE_REVISION
@@ -36,7 +77,7 @@ ENV RECORDWEB_REPLAY_ENABLED=1 \
     RECORDWEB_REPLAY_DOWNLOAD_ROOT=/recordings/replay \
     RECORDWEB_LOG_DIR=/var/log/recordweb \
     PYTHONFAULTHANDLER=1
-LABEL org.opencontainers.image.version="1.2.9-replay-20261106-r2" \
+LABEL org.opencontainers.image.version="1.2.9-deps-20261108" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 VOLUME ["/var/log/recordweb"]
 ENTRYPOINT ["/opt/recordweb-docker/docker_support/entrypoint.sh"]
