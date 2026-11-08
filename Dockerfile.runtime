@@ -77,7 +77,7 @@ ENV RECORDWEB_REPLAY_ENABLED=1 \
     RECORDWEB_REPLAY_DOWNLOAD_ROOT=/recordings/replay \
     RECORDWEB_LOG_DIR=/var/log/recordweb \
     PYTHONFAULTHANDLER=1
-LABEL org.opencontainers.image.version="1.2.9-deps-20261108" \
+LABEL org.opencontainers.image.version="1.2.9-cime-tls-20261109" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 VOLUME ["/var/log/recordweb"]
 ENTRYPOINT ["/opt/recordweb-docker/docker_support/entrypoint.sh"]
