@@ -41,7 +41,7 @@ docker compose -f compose.runtime.yaml pull
 docker compose -f compose.runtime.yaml up -d
 ```
 
-직접 빌드할 때는 아래 명령을 사용합니다. 빌드는 보존된 원본 입력과 패치 결과의 해시를 확인한 뒤 컨테이너의 `/app`에 실행 사본을 만듭니다. 개인용 타임스탬프 확장은 공개 이미지에 포함되지 않습니다. [Docker 실행 구조](RUNTIME.md) · [이전 Docker판 안내](README-Docker.md)
+직접 빌드할 때는 아래 명령을 사용합니다. 빌드는 보존된 원본 입력과 패치 결과의 해시를 확인한 뒤 컨테이너의 `/app`에 실행 사본을 만듭니다. [Docker 실행 구조](RUNTIME.md) · [이전 Docker판 안내](README-Docker.md)
 
 ```sh
 docker build -f Dockerfile.runtime --target runtime -t recordweb-runtime .
