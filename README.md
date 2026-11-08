@@ -1,40 +1,48 @@
 # recordWEB Docker
 
-recordWEB v1.2.9의 웹 녹화 기능과 다시보기 다운로드를 Linux AMD64·ARM64 Docker 이미지로 제공합니다.
-
-이미지 지원 플랫폼은 `linux/amd64`와 `linux/arm64`입니다. Docker가 호스트에 맞는 이미지를 선택합니다.
+recordWEB은 치지직(CHZZK)과 씨미(CIME) 실시간 방송을 녹화하는 프로그램입니다. 원본 **recordWEB v1.2.9**는 **ㅇㅇ(poestar)**님이 개발했습니다. 이 저장소는 원본을 바탕으로 보안 패치와 웹 다시보기 기능을 더한 Linux AMD64·ARM64 Docker판을 제공합니다. [원본 게시글](https://gall.dcinside.com/mgallery/board/view/?id=stellive&no=2427022) · [현재 릴리스와 패치노트](https://github.com/PCBiS/recordweb/releases/tag/cime-tls-20261109)
 
 ## 빠른 실행
+
+저장소를 내려받은 디렉터리에서 실행한 뒤 브라우저로 <http://localhost:5000>을 엽니다. [compose.runtime.yaml](compose.runtime.yaml)은 `ghcr.io/pcbis/recordweb:v1.2.9-cime-tls-20261109`를 사용하며, Docker가 호스트에 맞는 이미지를 선택합니다.
 
 ```sh
 docker compose -f compose.runtime.yaml up -d
 ```
 
-웹 화면은 <http://localhost:5000>에서 열립니다. 다시보기 다운로드는 로그인 모드를 켜고 로그인한 뒤 메뉴에서 이용합니다.
+## 1. 원본 기능
 
-- [최종 기능과 패치노트](RELEASE-NOTES.md)
-- [다시보기·클립 다운로드, 옵션과 저장 위치](REPLAY.md)
-- [Docker 실행·로그·진단](RUNTIME.md)
+- **실시간 녹화** — 웹에서 치지직·씨미 채널을 등록하고 방송 상태를 감시해 자동으로 녹화하거나 직접 시작·중지할 수 있습니다. 치지직은 기본·타임머신 플러그인, 소급 수신, 분할 녹화와 후처리를 지원합니다. 씨미는 화질을 선택해 HLS를 녹화하고 종료 후 임시 TS를 재인코딩 없이 MP4로 옮겨 담습니다.
+- **실행 방식** — 원본은 웹 서버, 데스크톱 GUI, 경량 CLI를 제공합니다. 이 Docker 이미지가 기본으로 실행하는 프로그램은 웹 서버입니다.
+- **웹 관리** — 채널·화질·저장 위치·파일명 규칙을 설정하고 녹화 상태와 시스템 자원을 확인합니다. 로그인·계정·플랫폼 쿠키 관리, 녹화 파일 탐색·이동·이름 변경, 텔레그램·디스코드 녹화 알림도 원본 기능입니다.
+- **다시보기 다운로더** — 원본에는 치지직·씨미 VOD와 YouTube 영상·재생목록의 주소 분석, 화질 선택, 다운로드 엔진이 있습니다. 데스크톱 GUI도 분석 결과를 대기열에 넣어 처리합니다. [원본 소스](upstream/) · [원본 다시보기 GUI](upstream/replayDownloader_GUI.py)
 
-## 업데이트
+## 2. AI를 활용해 보안을 강화한 원본 기능
 
-설정·영상 볼륨과 기존 Compose를 백업하고 진행 중인 녹화·다운로드를 마친 뒤 업데이트합니다.
+- **로그인·계정 관리** — 로그인 모드에서 인증되지 않은 요청은 설정·쿠키 등 보호된 화면을 실행하기 전에 로그인으로 이동하고, 보호된 API는 HTTP 401을 반환합니다. 계정 변경 시 빈 새 비밀번호를 거부하고 비밀번호를 로그에 출력하지 않습니다.
+- **파일관리** — 쓰기 작업에 읽기 전용 설정을 적용합니다. 새 이름에 경로 구분자나 상위 경로가 들어가는지 검사하고, 심볼릭 링크까지 해석한 최종 목적지가 허용된 폴더 안에 있는지 확인합니다. [앱 보안 패치](PATCH-RELEASE.md)
+- **CIME 인증서 검증** — 방송 정보·시청 페이지·HLS 재생목록을 조회할 때 발급자를 신뢰할 수 없거나 호스트명이 일치하지 않으면 해당 요청을 실패로 처리합니다. 검증을 끄고 쿠키와 함께 다시 보내던 경로를 제거했습니다. [CIME 수정 내역](RELEASE-NOTES.md)
+- **녹화에 쓰이는 외부 도구와 라이브러리** — 시스템과 Python의 신뢰 목록에서 정책에 지정한 루트 인증서 두 개를 제외하고, Python Brotli와 시스템 libbrotli1, urllib3, Streamlink, aiohttp를 보안 수정판으로 갱신했습니다. FFmpeg와 ffprobe는 공식 FFmpeg 9.0.2 소스에서 빌드합니다. [CA 정책](CA-RELEASE.md) · [의존성별 패치노트](https://github.com/PCBiS/recordweb/releases/tag/deps-20261108)
+
+## 3. AI를 활용해 별도로 개발한 Docker판 기능
+
+- **웹 다시보기·클립 다운로드** — 로그인 모드를 켜고 로그인한 뒤 **다시보기 다운로드** 메뉴(`/replay`)에서 원본 엔진을 이용할 수 있습니다. 치지직 공개 클립과 YouTube 실방송 주소도 이 메뉴에서 처리합니다. 치지직 서명 HLS 세그먼트를 지원하며, YouTube 라이브는 선택한 화질에 음성이 있으면 그대로 받고 영상 전용일 때만 음성을 결합합니다. [플랫폼별 지원 옵션](REPLAY.md)
+- **서버 대기열과 보관** — 분석과 다운로드를 각각 한 건씩 실행하고 진행 상태를 SQLite에 기록합니다. 브라우저를 다시 열어도 작업을 확인할 수 있고, 실패·중단된 작업은 같은 ID로 재시도할 수 있습니다. 검증을 마친 파일만 내려받을 수 있습니다. 완료된 다운로드 작업의 내역과 로그는 1시간 뒤 정리하고 영상은 보존합니다. 설정 화면에서 저장 경로와 최소 여유 공간(기본 5 GiB)을 지정할 수 있습니다.
+- **다시보기 요청 보호** — 다시보기 변경 요청은 로그인과 CSRF 토큰을 확인하고, Origin이 있으면 출처를 대조합니다. 지원하는 제공자 주소를 검사하며, 치지직 서명 HLS에서는 쿠키를 FFmpeg 세그먼트 요청에 넘기지 않습니다.
+- **저장공간 표시** — 설정의 **표시할 저장 경로**에 녹화 폴더를 지정하면 그 폴더가 있는 파일시스템의 전체·사용·가용 공간을 보여 줍니다. 같은 파일시스템의 폴더는 한 행으로 표시합니다. [저장공간 표시 방식](PATCH-RELEASE.md)
+- **영속 로그·진단팩** — 콘솔 출력을 회전 로그로 보존합니다. 오류·반복 경고·비정상 종료 시 진단팩을 만들거나 직접 생성할 수 있습니다. 진단팩에는 원문 로그·쿠키·계정 정보를 넣지 않습니다. [로그 위치와 진단 명령](RUNTIME.md)
+
+## 업데이트와 직접 빌드
+
+위 릴리스에 포함된 Compose 파일을 준비하고 설정·영상을 백업한 뒤, 진행 중인 녹화와 다운로드가 끝나면 업데이트합니다. 기본 Compose는 설정을 `./data/json`, 영상을 `./recordings`, 영속 로그를 `./logs`에 저장합니다.
 
 ```sh
 docker compose -f compose.runtime.yaml pull
 docker compose -f compose.runtime.yaml up -d
 ```
 
-`compose.runtime.yaml`은 `ghcr.io/pcbis/recordweb:v1.2.9-replay-20261106-r2`을 사용합니다. JSON·영상·로그는 각각 `./data/json`, `./recordings`, `./logs`에 보존됩니다. 완료 작업 내역은 완료 후1시간 정리하며 영상은 파일관리에서 계속 확인할 수 있습니다.
-
-## 원본과 Docker 구성
-
-원본 recordWEB은 `ㅇㅇ(poestar)`님이 개발했습니다. [원본 게시글](https://gall.dcinside.com/mgallery/board/view/?id=stellive&no=2427022)에서 프로그램 설명을 확인할 수 있습니다.
-
-원본 입력은 `upstream/`에 보존합니다. Docker 빌드는 `patches/`의 입력·결과 해시를 검사하고 `/app` 실행 사본을 생성합니다. `docker_support/`에는 다시보기 대기열과 Docker 로그·진단 지원을 둡니다. 저장소 루트의 기존 앱 파일은 원본 계열의 참조 소스로 보존하며, 새 배포 이미지는 `Dockerfile.runtime`에서 빌드합니다.
+직접 빌드할 때는 아래 명령을 사용합니다. 빌드는 보존된 원본 입력과 패치 결과의 해시를 확인한 뒤 컨테이너의 `/app`에 실행 사본을 만듭니다. 개인용 타임스탬프 확장은 공개 이미지에 포함되지 않습니다. [Docker 실행 구조](RUNTIME.md) · [이전 Docker판 안내](README-Docker.md)
 
 ```sh
-docker build -f Dockerfile.runtime --target runtime -t recordweb-replay .
+docker build -f Dockerfile.runtime --target runtime -t recordweb-runtime .
 ```
-
-[기존 Docker 안내](README-Docker.md)와 이전 릴리스 기록은 해당 버전의 구성과 이력으로 보존합니다.
