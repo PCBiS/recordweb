@@ -1,0 +1,97 @@
+name: image
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build amd64
+        run: docker buildx build --platform linux/amd64 --load -t recordweb:amd64 .
+
+      - name: Smoke test amd64
+        run: |
+          set -u
+          code() { curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$@"; }
+          expect() { want=$1; shift; got=$(code "$@"); echo "$got (want $want) $*"; [ "$got" = "$want" ]; }
+          docker run -d --name rw -e RWEB_ALLOWED_HOSTS=rec.example.test -e RWEB_ADMIN_PORT=5001 recordweb:amd64
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' rw)" = healthy ] && break
+            sleep 2
+          done
+          docker logs rw
+          [ "$(docker inspect -f '{{.State.Health.Status}}' rw)" = healthy ]
+          ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' rw)
+          # 접속 주소: 허용 목록은 통과, 그 밖은 400, 컨테이너 자신의 IP 는 원본대로 통과
+          expect 200 -H 'Host: rec.example.test' "http://$ip:5000/status"
+          expect 400 -H 'Host: other.example.test' "http://$ip:5000/status"
+          expect 200 "http://$ip:5000/status"
+          # 허용 목록의 주소는 "다른 기기": 서버 PC 전용 화면은 403
+          expect 403 -H 'Host: rec.example.test' "http://$ip:5000/register"
+          # Origin: 프록시가 TLS 를 끝낸 https 출처 허용, 다른 출처 거부
+          expect 403 -X POST -H 'Host: rec.example.test' -H 'Origin: https://evil.example.test' "http://$ip:5000/api/stop_all_recording"
+          expect 200 -X POST -H 'Host: rec.example.test' -H 'Origin: https://rec.example.test' "http://$ip:5000/api/stop_all_recording"
+          # 원격 잠금 방지: 다른 기기에서 원격 접속을 끌 수 없다
+          expect 403 -X POST -H 'Host: rec.example.test' -H 'Origin: https://rec.example.test' -H 'Content-Type: application/json' -d '{"remoteAccessEnabled": false}' "http://$ip:5000/api/save_config"
+          expect 200 -H 'Host: rec.example.test' "http://$ip:5000/status"
+          # 관리 포트: loopback 주소로만, 서버 PC 전용 화면이 열린다
+          expect 200 -H 'Host: 127.0.0.1:5001' "http://$ip:5001/register"
+          # 관리 포트로 와도 허용 목록 주소는 "다른 기기"로 취급한다
+          expect 403 -H 'Host: rec.example.test' "http://$ip:5001/register"
+          expect 400 -H 'Host: 127.0.0.1:5002' "http://$ip:5001/status"
+          docker exec rw sh -c 'ls -la /app/json && id'
+          docker stop -t 30 rw
+          docker logs --tail 20 rw
+          echo "exit code: $(docker inspect -f '{{.State.ExitCode}}' rw)"
+          [ "$(docker inspect -f '{{.State.ExitCode}}' rw)" = 0 ]
+
+      - name: Build arm64
+        run: docker buildx build --platform linux/arm64 --load -t recordweb:arm64 .
+
+      - name: Smoke test arm64 (emulated)
+        run: |
+          docker run -d --name rw64 --platform linux/arm64 recordweb:arm64
+          for i in $(seq 1 120); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' rw64)" = healthy ] && break
+            sleep 3
+          done
+          docker logs rw64
+          [ "$(docker inspect -f '{{.State.Health.Status}}' rw64)" = healthy ]
+          docker exec rw64 uname -m
+          docker stop -t 60 rw64
+
+      - uses: docker/login-action@v3
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Version
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: version
+        run: |
+          echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.version.outputs.image }}:${{ steps.version.outputs.value }}
+            ${{ steps.version.outputs.image }}:latest

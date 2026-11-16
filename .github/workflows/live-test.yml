@@ -1,0 +1,20 @@
+name: live-test
+
+# 실제 방송을 짧게 녹화해 보는 수동 시험. 방송 상황과 러너 위치에 따라 실패할 수 있다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build amd64
+        run: docker buildx build --platform linux/amd64 --load -t recordweb:amd64 .
+      - name: Live recording test
+        run: python3 tests/live_test.py recordweb:amd64
