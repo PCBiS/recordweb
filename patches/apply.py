@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""recordWEB v1.3.0 원본에 컨테이너용 패치를 적용한다.
+"""recordWEB v1.3.1 원본에 컨테이너용 패치를 적용한다.
 
 사용법: apply.py <원본을 푼 폴더>
 
@@ -12,8 +12,7 @@
    컨테이너 안의 전달기(docker/admin_forward.py)가 이 포트로 받은 연결을 loopback 으로 넘긴다.
 3. 원격 잠금 방지 (보안)
    다른 기기에서는 "다른 기기에서 접속 허용"과 서버 포트를 바꿀 수 없게 한다(원본의 서버 PC 전용 설정 목록에 추가).
-4. 씨미 인증서 검증 (보안)
-   인증서 검증에 실패했을 때 검증 없이 다시 요청하던 동작을 없앤다.
+(v1.3.0 판의 4번 "씨미 인증서 검증 실패 시 검증 없이 재요청 제거"는 원본 v1.3.1 이 같은 내용으로 고쳐 뺐다.)
 
 환경변수를 주지 않으면 1·2 는 원본과 같게 동작한다.
 원본 파일의 SHA-256 과 바꿀 문장이 정확히 한 번 나오는지를 확인하므로, 원본이 달라지면 빌드가 실패한다.
@@ -77,7 +76,7 @@ def allowed_origins(scheme, authority):
 
 PATCHES = {
     'module/access_control.py': {
-        'sha256': 'e7dff9d60d00cac524c05670dbbf8a59e3b21883b48057bde6ef089df6c382c7',
+        'sha256': '6fe52680e2afebc6738131f3e73e6880fb4eb65d739bb374da6f12a47c4980c6',
         'append': ACCESS_CONTROL_ADD,
         'replace': [
             (
@@ -90,12 +89,12 @@ PATCHES = {
         ],
     },
     'module/recordWEB.py': {
-        'sha256': '5d7c3371d016b2e6bf5201ecb16499908c1ef134bebc49ec7354587d72e982aa',
+        'sha256': '65636c1c0fdd4576e225a64ea503fda3bbbbfa42e66cad49396d062ad211343c',
         'append': '',
         'replace': [
             (
-                "from module.access_control import LOOPBACK, allowed_host, interface_ipv4_addresses, validate_network",
-                "from module.access_control import LOOPBACK, allowed_host, interface_ipv4_addresses, validate_network, extra_authority, allowed_origins",
+                "from module.access_control import LOOPBACK, allowed_host, interface_ipv4_addresses, interface_ipv4_display, validate_network",
+                "from module.access_control import LOOPBACK, allowed_host, interface_ipv4_addresses, interface_ipv4_display, validate_network, extra_authority, allowed_origins",
             ),
             (
                 "        or not (local_authority or allowed_host(authority, actual_port, bound_remote))",
@@ -112,21 +111,6 @@ PATCHES = {
                 "        'preset', 'preset_gpu1', 'postprocess_resolution', 'postprocess_resolution_gpu1',\n"
                 "        'remoteAccessEnabled', 'port',\n"
                 "    ):",
-            ),
-        ],
-    },
-    'module/cime_recorder.py': {
-        'sha256': '44319462d0732f191df5df88b5bc4e62245bbe9577e8dbf4b30ee2972b8c91a6',
-        'append': '',
-        'replace': [
-            (
-                "        print(\n"
-                "            f\"[CIME][SSL][WARN] 인증서 검증 실패. 해당 요청에 한해 ssl=False로 재시도: {url} / {e}\",\n"
-                "            flush=True,\n"
-                "        )\n"
-                "        return await _request_with_ssl(False)",
-                "        print(\"[CIME][SSL][ERROR] certificate verification failed:\", type(e).__name__, flush=True)\n"
-                "        raise",
             ),
         ],
     },

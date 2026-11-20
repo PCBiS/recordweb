@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# recordWEB v1.3.0 을 Linux Headless 모드로 실행하는 컨테이너 이미지.
-# 원본 ZIP 을 그대로 풀고 patches/apply.py 의 패치(컨테이너 맞춤 2건, 보안 2건)를 적용한다.
+# recordWEB v1.3.1 을 Linux Headless 모드로 실행하는 컨테이너 이미지.
+# 원본 ZIP 을 그대로 풀고 patches/apply.py 의 패치(컨테이너 맞춤 2건, 보안 1건)를 적용한다.
 ARG PYTHON_IMAGE=python:3.13-slim-bookworm
 
 FROM ${PYTHON_IMAGE} AS source
@@ -10,7 +10,7 @@ RUN apt-get update \
 COPY upstream/ /upstream/
 COPY patches/apply.py /patches/apply.py
 RUN cd /upstream && sha256sum -c SHA256SUMS \
-    && mkdir /app && unzip -q recordWEB_v1.3.0.zip -d /app \
+    && mkdir /app && unzip -q recordWEB_v1.3.1.zip -d /app \
     && python -I /patches/apply.py /app \
     && chmod -R u=rwX,go=rX /app
 

@@ -1,7 +1,7 @@
 # 권장 구성(Linux): 호스트 망을 그대로 쓴다. 원본을 서버에 직접 설치한 것과 같게 동작한다.
 services:
   recordweb:
-    image: ghcr.io/pcbis/recordweb:1.3.0
+    image: ghcr.io/pcbis/recordweb:1.3.1
     # 직접 빌드하려면 위 image 줄 대신: build: .
     container_name: recordweb
     restart: unless-stopped
