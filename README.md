@@ -9,7 +9,7 @@ recordWEB v1.3.1을 Linux Headless 모드로 실행하는 컨테이너 이미지
 | 항목 | 내용 |
 |---|---|
 | 실행 | `recordWEB.sh` 대신 백엔드를 바로 실행합니다. 창과 트레이는 없습니다 |
-| 패치 | 3건. 아래 "패치" 참고. 내용은 `patches/apply.py`에 있습니다 |
+| 패치 | 4건. 아래 "패치" 참고. 내용은 `patches/apply.py`에 있습니다 |
 | 첫 실행 설정 | 설정 파일이 없으면 원본 기본값을 복사하고 **다른 기기에서 접속 허용**을 켭니다. 그 밖의 값은 원본 기본값입니다(로그인 꺼짐) |
 | 다시보기 | 원본에서 별도 Windows 프로그램(`replayDownloader`)으로 제공합니다. 이 이미지에는 없습니다 |
 | GPU 인코딩 | 시험하지 않았습니다 |
@@ -46,6 +46,7 @@ recordWEB은 요청의 주소(Host 헤더)가 `127.0.0.1`·`localhost`이거나 
 
 - 브라우저 주소창의 주소와 글자 그대로 같아야 합니다. 포트가 80·443이 아니면 포트까지 적습니다.
 - 리버스 프록시는 원래의 `Host` 헤더를 그대로 넘겨야 합니다(nginx: `proxy_set_header Host $host;`).
+- HTTPS 프록시는 `X-Forwarded-Proto: https`도 넘겨야 합니다(nginx: `proxy_set_header X-Forwarded-Proto $scheme;`). 빠지면 화면의 JS·CSS 주소가 `http://`가 되어 브라우저가 막고 화면이 하얗게 나옵니다. 이 헤더는 `RWEB_ALLOWED_HOSTS`에 적은 주소로 온 요청에만 적용합니다.
 - 비워 두면 원본과 똑같이 동작합니다.
 - 이 목록의 주소로 들어온 접속은 프록시가 같은 서버에 있어도 "다른 기기"로 취급합니다. 서버 PC 전용 기능은 열리지 않습니다.
 
@@ -102,15 +103,16 @@ docker exec recordweb ffmpeg -fflags +genpts -i "/app/output/<파일>.mp4" -c co
 
 ## 패치
 
-원본 파일은 아래 3곳만 바꿉니다. 환경변수를 주지 않으면 1·2는 원본과 같게 동작합니다.
+원본 파일은 아래 4곳만 바꿉니다. 환경변수를 주지 않으면 1·2·4는 원본과 같게 동작합니다.
 
 | 번호 | 구분 | 내용 | 파일 |
 |---|---|---|---|
 | 1 | 컨테이너 맞춤 | `RWEB_ALLOWED_HOSTS`의 주소를 접속 주소와 Origin 검사에서 허용 | `module/access_control.py`, `module/recordWEB.py` |
 | 2 | 컨테이너 맞춤 | `RWEB_ADMIN_PORT`로 온 loopback 주소 요청을 서버 PC 주소로 인정 | `module/access_control.py` |
 | 3 | 보안 | 다른 기기에서 **다른 기기에서 접속 허용**과 서버 포트를 바꿀 수 없게 함. 원본은 누구나 요청 한 번으로 원격 접속을 꺼서 모두를 잠글 수 있습니다 | `module/recordWEB.py` |
+| 4 | 컨테이너 맞춤 | `RWEB_ALLOWED_HOSTS`의 주소로 `X-Forwarded-Proto: https`와 함께 온 요청을 https로 취급. 원본은 요청을 늘 http로 보고 화면 자원 주소를 `http://` 절대 주소로 만들어 HTTPS 프록시 뒤에서 화면이 하얗게 남습니다. 접속 IP는 바꾸지 않습니다 | `module/access_control.py`, `module/recordWEB.py` |
 
-v1.3.0 이미지의 4번 패치(씨미 요청이 인증서 검증에 실패하면 검증 없이 다시 요청하던 동작 제거)는 원본 v1.3.1에 같은 수정이 들어가 뺐습니다.
+v1.3.0 이미지에 있던 다른 4번 패치(씨미 요청이 인증서 검증에 실패하면 검증 없이 다시 요청하던 동작 제거)는 원본 v1.3.1에 같은 수정이 들어가 뺐습니다.
 
 ## 직접 빌드
 

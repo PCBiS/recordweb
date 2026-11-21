@@ -12,9 +12,14 @@
    컨테이너 안의 전달기(docker/admin_forward.py)가 이 포트로 받은 연결을 loopback 으로 넘긴다.
 3. 원격 잠금 방지 (보안)
    다른 기기에서는 "다른 기기에서 접속 허용"과 서버 포트를 바꿀 수 없게 한다(원본의 서버 PC 전용 설정 목록에 추가).
-(v1.3.0 판의 4번 "씨미 인증서 검증 실패 시 검증 없이 재요청 제거"는 원본 v1.3.1 이 같은 내용으로 고쳐 뺐다.)
+4. HTTPS 리버스 프록시 (컨테이너 맞춤)
+   원본은 uvicorn 을 proxy_headers=False 로 실행해 요청을 늘 http 로 보고, 화면의 JS·CSS 주소를
+   http://<주소>/static/... 절대 주소로 만든다. HTTPS 프록시 뒤에서는 브라우저가 이를 혼합 콘텐츠로 막아
+   화면이 하얗게 남는다. Host 가 RWEB_ALLOWED_HOSTS 의 주소이고 X-Forwarded-Proto 가 https 인 요청만
+   https 요청으로 취급한다. 접속 IP(X-Forwarded-For)는 바꾸지 않는다.
+(v1.3.0 판에 있던 다른 4번 "씨미 인증서 검증 실패 시 검증 없이 재요청 제거"는 원본 v1.3.1 이 같은 내용으로 고쳐 뺐다.)
 
-환경변수를 주지 않으면 1·2 는 원본과 같게 동작한다.
+환경변수를 주지 않으면 1·2·4 는 원본과 같게 동작한다.
 원본 파일의 SHA-256 과 바꿀 문장이 정확히 한 번 나오는지를 확인하므로, 원본이 달라지면 빌드가 실패한다.
 """
 import hashlib
@@ -66,6 +71,23 @@ def extra_authority(host):
     return isinstance(host, str) and host.lower() in EXTRA_AUTHORITIES
 
 
+def forwarded_https(asgi_app):
+    """Requests to an operator-listed address marked X-Forwarded-Proto: https are served as https."""
+    if not EXTRA_AUTHORITIES:
+        return asgi_app
+
+    async def wrapper(scope, receive, send):
+        if scope.get('type') in ('http', 'websocket') and scope.get('scheme') in ('http', 'ws'):
+            headers = dict(scope.get('headers') or ())
+            host = headers.get(b'host', b'').decode('latin-1')
+            proto = headers.get(b'x-forwarded-proto', b'').decode('latin-1').split(',')[0].strip().lower()
+            if proto == 'https' and extra_authority(host):
+                scope = dict(scope, scheme='https' if scope['type'] == 'http' else 'wss')
+        return await asgi_app(scope, receive, send)
+
+    return wrapper
+
+
 def allowed_origins(scheme, authority):
     authority = authority.lower()
     origins = [f'{scheme}://{authority}']
@@ -94,7 +116,7 @@ PATCHES = {
         'replace': [
             (
                 "from module.access_control import LOOPBACK, allowed_host, interface_ipv4_addresses, interface_ipv4_display, validate_network",
-                "from module.access_control import LOOPBACK, allowed_host, interface_ipv4_addresses, interface_ipv4_display, validate_network, extra_authority, allowed_origins",
+                "from module.access_control import LOOPBACK, allowed_host, interface_ipv4_addresses, interface_ipv4_display, validate_network, extra_authority, allowed_origins, forwarded_https",
             ),
             (
                 "        or not (local_authority or allowed_host(authority, actual_port, bound_remote))",
@@ -111,6 +133,10 @@ PATCHES = {
                 "        'preset', 'preset_gpu1', 'postprocess_resolution', 'postprocess_resolution_gpu1',\n"
                 "        'remoteAccessEnabled', 'port',\n"
                 "    ):",
+            ),
+            (
+                "        config = uvicorn.Config(app, host=host,",
+                "        config = uvicorn.Config(forwarded_https(app), host=host,",
             ),
         ],
     },

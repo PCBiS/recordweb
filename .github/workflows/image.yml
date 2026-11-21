@@ -48,6 +48,12 @@ jobs:
           # 원격 잠금 방지: 다른 기기에서 원격 접속을 끌 수 없다
           expect 403 -X POST -H 'Host: rec.example.test' -H 'Origin: https://rec.example.test' -H 'Content-Type: application/json' -d '{"remoteAccessEnabled": false}' "http://$ip:5000/api/save_config"
           expect 200 -H 'Host: rec.example.test' "http://$ip:5000/status"
+          # HTTPS 프록시: 허용 목록 주소 + X-Forwarded-Proto https 면 화면 자원 주소가 https, 그 밖은 원본대로 http
+          page() { curl -s --max-time 10 "$@" "http://$ip:5000/"; }
+          page -H 'Host: rec.example.test' -H 'X-Forwarded-Proto: https' | grep -q 'src="https://rec.example.test/static/js/runtime-guard.js'
+          page -H 'Host: rec.example.test' | grep -q 'src="http://rec.example.test/static/js/runtime-guard.js'
+          page -H "Host: $ip:5000" -H 'X-Forwarded-Proto: https' | grep -q "src=\"http://$ip:5000/static/js/runtime-guard.js"
+          expect 200 -X POST -H 'Host: rec.example.test' -H 'X-Forwarded-Proto: https' -H 'Origin: https://rec.example.test' "http://$ip:5000/api/stop_all_recording"
           # 관리 포트: loopback 주소로만, 서버 PC 전용 화면이 열린다
           expect 200 -H 'Host: 127.0.0.1:5001' "http://$ip:5001/register"
           # 관리 포트로 와도 허용 목록 주소는 "다른 기기"로 취급한다

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # recordWEB v1.3.1 을 Linux Headless 모드로 실행하는 컨테이너 이미지.
-# 원본 ZIP 을 그대로 풀고 patches/apply.py 의 패치(컨테이너 맞춤 2건, 보안 1건)를 적용한다.
+# 원본 ZIP 을 그대로 풀고 patches/apply.py 의 패치(컨테이너 맞춤 3건, 보안 1건)를 적용한다.
 ARG PYTHON_IMAGE=python:3.13-slim-bookworm
 
 FROM ${PYTHON_IMAGE} AS source
