@@ -1,8 +1,8 @@
-# recordWEB v1.3.1 Docker
+# recordWEB v1.3.2b Docker
 
-recordWEB v1.3.1을 Linux Headless 모드로 실행하는 컨테이너 이미지입니다. 치지직·씨미 라이브를 녹화합니다.
+recordWEB v1.3.2b를 Linux Headless 모드로 실행하는 컨테이너 이미지입니다. 치지직·씨미 라이브를 녹화합니다.
 
-원본 배포 ZIP(`upstream/recordWEB_v1.3.1.zip`)을 그대로 풀어 넣고, 컨테이너에서 접속하는 데 필요한 패치와 최소한의 보안 패치만 적용했습니다. 기능은 원본과 같습니다. 사용법은 ZIP 안의 `README.md`를 보세요.
+원본 배포 ZIP(`upstream/recordWEB_v1.3.2b.zip`)을 그대로 풀어 넣고, 컨테이너에서 접속하는 데 필요한 패치와 최소한의 보안 패치만 적용했습니다. 기능은 원본과 같습니다. 사용법은 ZIP 안의 `README.md`를 보세요.
 
 ## 원본과 다른 점
 
@@ -13,6 +13,8 @@ recordWEB v1.3.1을 Linux Headless 모드로 실행하는 컨테이너 이미지
 | 첫 실행 설정 | 설정 파일이 없으면 원본 기본값을 복사하고 **다른 기기에서 접속 허용**을 켭니다. 그 밖의 값은 원본 기본값입니다(로그인 꺼짐) |
 | 다시보기 | 원본에서 별도 Windows 프로그램(`replayDownloader`)으로 제공합니다. 이 이미지에는 없습니다 |
 | GPU 인코딩 | 시험하지 않았습니다 |
+| Linux 부팅 자동 실행 | 원본의 systemd 사용자 서비스 등록은 컨테이너에서 쓸 수 없어 설정 화면에 나오지 않습니다. compose의 `restart: unless-stopped`가 대신합니다 |
+| 설정 백업·복원 | 원본대로 서버 PC(bridge 망에서는 관리 포트)에서만 열립니다. 복원 전 자동 백업은 `/app/json/backups`에 남습니다 |
 
 ## 시작 (Linux, 호스트 망)
 
@@ -117,7 +119,7 @@ v1.3.0 이미지에 있던 다른 4번 패치(씨미 요청이 인증서 검증�
 ## 직접 빌드
 
 ```sh
-docker build -t recordweb:1.3.1 .
+docker build -t recordweb:1.3.2b .
 ```
 
 빌드는 ZIP의 SHA-256과 패치 대상 파일의 SHA-256을 확인합니다. 다른 ZIP으로 바꾸면 빌드가 실패합니다.

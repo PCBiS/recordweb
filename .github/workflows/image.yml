@@ -59,6 +59,9 @@ jobs:
           # 관리 포트로 와도 허용 목록 주소는 "다른 기기"로 취급한다
           expect 403 -H 'Host: rec.example.test' "http://$ip:5001/register"
           expect 400 -H 'Host: 127.0.0.1:5002' "http://$ip:5001/status"
+          # 설정 백업(원본 1.3.2b): 서버 PC 전용. 다른 기기 403, 관리 포트 200
+          expect 403 -H 'Host: rec.example.test' "http://$ip:5000/backup"
+          expect 200 -H 'Host: 127.0.0.1:5001' "http://$ip:5001/backup"
           docker exec rw sh -c 'ls -la /app/json && id'
           docker stop -t 30 rw
           docker logs --tail 20 rw

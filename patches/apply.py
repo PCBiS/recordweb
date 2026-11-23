@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""recordWEB v1.3.1 원본에 컨테이너용 패치를 적용한다.
+"""recordWEB v1.3.2b 원본에 컨테이너용 패치를 적용한다.
 
 사용법: apply.py <원본을 푼 폴더>
 
@@ -111,7 +111,7 @@ PATCHES = {
         ],
     },
     'module/recordWEB.py': {
-        'sha256': '65636c1c0fdd4576e225a64ea503fda3bbbbfa42e66cad49396d062ad211343c',
+        'sha256': 'a406db0219a8aa37f3de89dd13a4917f845fcf3b3d23b24bac3102ef8108c9f1',
         'append': '',
         'replace': [
             (
